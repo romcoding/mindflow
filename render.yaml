@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: mindflow-backend
+    env: python
+    buildCommand: "cd mindflow-backend && pip install -r requirements.txt"
+    startCommand: "cd mindflow-backend && python src/main.py"
+    plan: free
+    healthCheckPath: /api/auth/profile
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindflow-db
+          property: connectionString
+    autoDeploy: true
+
+databases:
+  - name: mindflow-db
+    databaseName: mindflow
+    user: mindflow_user
+    plan: free
