@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { tasksAPI, stakeholdersAPI, notesAPI } from '../lib/api';
+import { tasksAPI, stakeholdersAPI, notesAPI } from '../lib/api.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
