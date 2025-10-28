@@ -5,7 +5,12 @@ const baseURL = (typeof import.meta !== 'undefined' && import.meta.env && import
   ? import.meta.env.VITE_API_BASE_URL
   : '/api';
 
-const api = axios.create({ baseURL });
+const api = axios.create({ 
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 // Attach access token to all requests by default
 api.interceptors.request.use((config) => {
@@ -16,6 +21,39 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Better error handling interceptor
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      // Server responded with error
+      const status = error.response.status;
+      const data = error.response.data;
+      
+      console.error(`API Error [${status}]:`, data);
+      
+      // Handle 401 - Unauthorized (token expired/invalid)
+      if (status === 401 && !error.config.url.includes('/auth/')) {
+        // Don't handle auth endpoint errors here
+      }
+    } else if (error.request) {
+      // Request made but no response
+      console.error('No response from server:', error.request);
+      error.response = {
+        data: { error: 'Network error. Please check your connection and try again.' }
+      };
+    } else {
+      // Error in request setup
+      console.error('Request error:', error.message);
+      error.response = {
+        data: { error: 'Request failed. Please try again.' }
+      };
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 // Auth API with explicit handling for refresh token usage
 export const authAPI = {
@@ -49,5 +87,3 @@ export const notesAPI = {
 };
 
 export default api;
-
-

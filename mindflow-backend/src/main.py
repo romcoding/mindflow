@@ -21,11 +21,19 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
 
 # Initialize extensions
 jwt = JWTManager(app)
 bcrypt.init_app(app)
-CORS(app, origins=['http://localhost:3000', 'https://*.vercel.app'])
+
+# CORS configuration - allow all origins in production (adjust as needed)
+allowed_origins = os.environ.get('ALLOWED_ORIGINS', '*')
+CORS(app, 
+     origins=allowed_origins if allowed_origins != '*' else ['*'],
+     supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
