@@ -268,12 +268,12 @@ const StakeholderDetailModal = ({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="basic">Basic</TabsTrigger>
-            <TabsTrigger value="professional">Professional</TabsTrigger>
-            <TabsTrigger value="personal">Personal</TabsTrigger>
-            <TabsTrigger value="communication">Communication</TabsTrigger>
-            <TabsTrigger value="relationship">Relationship</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 gap-1">
+            <TabsTrigger value="basic" className="text-xs px-2">Basic</TabsTrigger>
+            <TabsTrigger value="professional" className="text-xs px-2">Professional</TabsTrigger>
+            <TabsTrigger value="personal" className="text-xs px-2">Personal</TabsTrigger>
+            <TabsTrigger value="communication" className="text-xs px-1">Comm.</TabsTrigger>
+            <TabsTrigger value="relationship" className="text-xs px-1">Relation</TabsTrigger>
           </TabsList>
 
           {/* Basic Information Tab */}

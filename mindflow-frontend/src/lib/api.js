@@ -73,17 +73,23 @@ export const authAPI = {
 export const tasksAPI = {
   getTasks: (params) => api.get('/tasks', { params }),
   createTask: (task) => api.post('/tasks', task),
+  updateTask: (taskId, task) => api.put(`/tasks/${taskId}`, task),
+  deleteTask: (taskId) => api.delete(`/tasks/${taskId}`),
   toggleTask: (taskId) => api.patch(`/tasks/${taskId}/toggle`),
 };
 
 export const stakeholdersAPI = {
   getStakeholders: () => api.get('/stakeholders'),
   createStakeholder: (stakeholder) => api.post('/stakeholders', stakeholder),
+  updateStakeholder: (stakeholderId, stakeholder) => api.put(`/stakeholders/${stakeholderId}`, stakeholder),
+  deleteStakeholder: (stakeholderId) => api.delete(`/stakeholders/${stakeholderId}`),
 };
 
 export const notesAPI = {
   getNotes: () => api.get('/notes'),
   createNote: (note) => api.post('/notes', note),
+  updateNote: (noteId, note) => api.put(`/notes/${noteId}`, note),
+  deleteNote: (noteId) => api.delete(`/notes/${noteId}`),
 };
 
 export default api;

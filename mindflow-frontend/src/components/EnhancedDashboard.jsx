@@ -187,42 +187,55 @@ const EnhancedDashboard = () => {
   };
 
   const handleQuickAdd = async (type = null) => {
-    if (!quickAddText.trim()) return;
+    if (!quickAddText.trim()) {
+      alert('Please enter some text first!');
+      return;
+    }
 
     const analysis = type ? { ...analysisResult, type } : analyzeContent(quickAddText);
     
     try {
       if (analysis.type === 'task') {
-        await tasksAPI.createTask({
+        const taskData = {
           title: quickAddText,
           description: '',
-          priority: analysis.priority,
+          priority: analysis.priority || 'medium',
           due_date: analysis.dueDate,
           status: 'todo',
           board_column: 'todo'
-        });
+        };
+        console.log('Creating task:', taskData);
+        await tasksAPI.createTask(taskData);
+        alert('Task created successfully!');
       } else if (analysis.type === 'stakeholder') {
         const name = analysis.extractedNames[0] || 'New Contact';
-        await stakeholdersAPI.createStakeholder({
+        const stakeholderData = {
           name: name,
           personal_notes: quickAddText,
           sentiment: 'neutral',
           influence: 5,
           interest: 5
-        });
+        };
+        console.log('Creating stakeholder:', stakeholderData);
+        await stakeholdersAPI.createStakeholder(stakeholderData);
+        alert('Contact created successfully!');
       } else {
-        await notesAPI.createNote({
+        const noteData = {
           content: quickAddText,
           category: 'general'
-        });
+        };
+        console.log('Creating note:', noteData);
+        await notesAPI.createNote(noteData);
+        alert('Note created successfully!');
       }
       
       setQuickAddText('');
       setIsQuickAddOpen(false);
       setAnalysisResult(null);
-      loadData();
+      await loadData(); // Ensure data is reloaded
     } catch (error) {
       console.error('Failed to create item:', error);
+      alert(`Failed to create item: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -285,16 +298,20 @@ const EnhancedDashboard = () => {
 
   const handleStakeholderSave = async (stakeholderData) => {
     try {
-      if (selectedStakeholder) {
+      console.log('Saving stakeholder:', stakeholderData);
+      if (selectedStakeholder && selectedStakeholder.id) {
         await stakeholdersAPI.updateStakeholder(selectedStakeholder.id, stakeholderData);
+        alert('Stakeholder updated successfully!');
       } else {
         await stakeholdersAPI.createStakeholder(stakeholderData);
+        alert('Stakeholder created successfully!');
       }
       setIsStakeholderModalOpen(false);
       setSelectedStakeholder(null);
-      loadData();
+      await loadData(); // Ensure data is reloaded
     } catch (error) {
       console.error('Failed to save stakeholder:', error);
+      alert(`Failed to save stakeholder: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -841,26 +858,28 @@ const EnhancedDashboard = () => {
               </Card>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsQuickAddOpen(false)}>
-                Cancel
-              </Button>
+            <div className="flex flex-col gap-3">
               {analysisResult && (
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => handleQuickAdd('task')}>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Button variant="outline" onClick={() => handleQuickAdd('task')} className="flex-1 min-w-[120px]">
                     Save as Task
                   </Button>
-                  <Button variant="outline" onClick={() => handleQuickAdd('stakeholder')}>
+                  <Button variant="outline" onClick={() => handleQuickAdd('stakeholder')} className="flex-1 min-w-[120px]">
                     Save as Contact
                   </Button>
-                  <Button variant="outline" onClick={() => handleQuickAdd('note')}>
+                  <Button variant="outline" onClick={() => handleQuickAdd('note')} className="flex-1 min-w-[120px]">
                     Save as Note
                   </Button>
                 </div>
               )}
-              <Button onClick={() => handleQuickAdd()}>
-                Smart Add
-              </Button>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setIsQuickAddOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => handleQuickAdd()} className="bg-blue-600 hover:bg-blue-700">
+                  Smart Add
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
