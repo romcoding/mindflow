@@ -1,7 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
+from src.models.db import db, bcrypt
 from datetime import datetime
-from src.models.organization import Organization
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()

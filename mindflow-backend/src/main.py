@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, send_from_directory
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
-from src.models.user import db, bcrypt
+from src.models.db import db, bcrypt
 from src.routes.user import user_bp
 from src.routes.auth import auth_bp
 from src.routes.tasks import tasks_bp
@@ -15,7 +15,11 @@ from src.routes.notes import notes_bp
 from datetime import timedelta
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from src.models.user import User
 from src.models.organization import Organization
+from src.models.task import Task
+from src.models.stakeholder import Stakeholder
+from src.models.note import Note
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 
@@ -66,9 +70,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # Import all models to ensure they're registered
-from src.models.task import Task
-from src.models.stakeholder import Stakeholder
-from src.models.note import Note
+# from src.models.task import Task
+# from src.models.stakeholder import Stakeholder
+# from src.models.note import Note
 
 with app.app_context():
     db.create_all()

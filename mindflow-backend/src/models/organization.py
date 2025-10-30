@@ -1,6 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy
+from src.models.db import db
 from datetime import datetime
-from src.models.user import db
 
 class Organization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
