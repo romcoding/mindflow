@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user import db
 from src.models.note import Note
 from src.models.stakeholder import Stakeholder
@@ -7,10 +6,9 @@ from src.models.stakeholder import Stakeholder
 notes_bp = Blueprint('notes', __name__)
 
 @notes_bp.route('/notes', methods=['GET'])
-@jwt_required()
 def get_notes():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         
         # Get query parameters for filtering
         category = request.args.get('category')
@@ -40,10 +38,9 @@ def get_notes():
         return jsonify({'error': 'Failed to get notes', 'details': str(e)}), 500
 
 @notes_bp.route('/notes', methods=['POST'])
-@jwt_required()
 def create_note():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         data = request.get_json()
         
         # Validate required fields
@@ -82,10 +79,9 @@ def create_note():
         return jsonify({'error': 'Failed to create note', 'details': str(e)}), 500
 
 @notes_bp.route('/notes/<int:note_id>', methods=['GET'])
-@jwt_required()
 def get_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:
@@ -97,10 +93,9 @@ def get_note(note_id):
         return jsonify({'error': 'Failed to get note', 'details': str(e)}), 500
 
 @notes_bp.route('/notes/<int:note_id>', methods=['PUT'])
-@jwt_required()
 def update_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:
@@ -143,10 +138,9 @@ def update_note(note_id):
         return jsonify({'error': 'Failed to update note', 'details': str(e)}), 500
 
 @notes_bp.route('/notes/<int:note_id>', methods=['DELETE'])
-@jwt_required()
 def delete_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:

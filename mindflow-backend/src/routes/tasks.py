@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user import db
 from src.models.task import Task
 from src.models.stakeholder import Stakeholder
@@ -8,10 +7,9 @@ from datetime import datetime
 tasks_bp = Blueprint('tasks', __name__)
 
 @tasks_bp.route('/tasks', methods=['GET'])
-@jwt_required()
 def get_tasks():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         
         # Get query parameters for filtering
         completed = request.args.get('completed')
@@ -44,10 +42,9 @@ def get_tasks():
         return jsonify({'error': 'Failed to get tasks', 'details': str(e)}), 500
 
 @tasks_bp.route('/tasks', methods=['POST'])
-@jwt_required()
 def create_task():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         data = request.get_json()
         
         # Validate required fields
@@ -93,10 +90,9 @@ def create_task():
         return jsonify({'error': 'Failed to create task', 'details': str(e)}), 500
 
 @tasks_bp.route('/tasks/<int:task_id>', methods=['GET'])
-@jwt_required()
 def get_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -108,10 +104,9 @@ def get_task(task_id):
         return jsonify({'error': 'Failed to get task', 'details': str(e)}), 500
 
 @tasks_bp.route('/tasks/<int:task_id>', methods=['PUT'])
-@jwt_required()
 def update_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -163,10 +158,9 @@ def update_task(task_id):
         return jsonify({'error': 'Failed to update task', 'details': str(e)}), 500
 
 @tasks_bp.route('/tasks/<int:task_id>', methods=['DELETE'])
-@jwt_required()
 def delete_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -182,10 +176,9 @@ def delete_task(task_id):
         return jsonify({'error': 'Failed to delete task', 'details': str(e)}), 500
 
 @tasks_bp.route('/tasks/<int:task_id>/toggle', methods=['PATCH'])
-@jwt_required()
 def toggle_task_completion(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:

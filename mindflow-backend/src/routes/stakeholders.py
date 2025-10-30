@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user import db
 from src.models.stakeholder import Stakeholder
 from datetime import datetime
@@ -7,10 +6,9 @@ from datetime import datetime
 stakeholders_bp = Blueprint('stakeholders', __name__)
 
 @stakeholders_bp.route('/stakeholders', methods=['GET'])
-@jwt_required()
 def get_stakeholders():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         
         # Get query parameters for filtering
         sentiment = request.args.get('sentiment')
@@ -36,10 +34,9 @@ def get_stakeholders():
         return jsonify({'error': 'Failed to get stakeholders', 'details': str(e)}), 500
 
 @stakeholders_bp.route('/stakeholders', methods=['POST'])
-@jwt_required()
 def create_stakeholder():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         data = request.get_json()
         
         # Validate required fields
@@ -99,10 +96,9 @@ def create_stakeholder():
         return jsonify({'error': 'Failed to create stakeholder', 'details': str(e)}), 500
 
 @stakeholders_bp.route('/stakeholders/<int:stakeholder_id>', methods=['GET'])
-@jwt_required()
 def get_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -117,10 +113,9 @@ def get_stakeholder(stakeholder_id):
         return jsonify({'error': 'Failed to get stakeholder', 'details': str(e)}), 500
 
 @stakeholders_bp.route('/stakeholders/<int:stakeholder_id>', methods=['PUT'])
-@jwt_required()
 def update_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -206,10 +201,9 @@ def update_stakeholder(stakeholder_id):
         return jsonify({'error': 'Failed to update stakeholder', 'details': str(e)}), 500
 
 @stakeholders_bp.route('/stakeholders/<int:stakeholder_id>', methods=['DELETE'])
-@jwt_required()
 def delete_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -228,10 +222,9 @@ def delete_stakeholder(stakeholder_id):
         return jsonify({'error': 'Failed to delete stakeholder', 'details': str(e)}), 500
 
 @stakeholders_bp.route('/stakeholders/<int:stakeholder_id>/contact', methods=['PATCH'])
-@jwt_required()
 def update_last_contact(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = 1
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id

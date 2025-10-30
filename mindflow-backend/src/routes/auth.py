@@ -171,7 +171,6 @@ def login():
         return jsonify({'error': 'Login failed', 'details': str(e)}), 500
 
 @auth_bp.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)
 def refresh():
     try:
         current_user_id = get_jwt_identity()
@@ -195,7 +194,6 @@ def refresh():
         return jsonify({'error': 'Token refresh failed', 'details': str(e)}), 500
 
 @auth_bp.route('/profile', methods=['GET'])
-@jwt_required()
 def get_profile():
     try:
         current_user_id = get_jwt_identity()
@@ -210,7 +208,6 @@ def get_profile():
         return jsonify({'error': 'Failed to get profile', 'details': str(e)}), 500
 
 @auth_bp.route('/profile', methods=['PUT'])
-@jwt_required()
 def update_profile():
     try:
         current_user_id = get_jwt_identity()
@@ -248,7 +245,6 @@ def update_profile():
         return jsonify({'error': 'Failed to update profile', 'details': str(e)}), 500
 
 @auth_bp.route('/change-password', methods=['PUT'])
-@jwt_required()
 def change_password():
     try:
         current_user_id = get_jwt_identity()
