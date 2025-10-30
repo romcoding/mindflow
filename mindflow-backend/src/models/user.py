@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from datetime import datetime
+from src.models.organization import Organization
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
@@ -15,6 +16,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
+    org_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=True)  # For multi-tenant
+    organization = db.relationship('Organization', backref='users', lazy=True)
 
     # Relationships
     tasks = db.relationship('Task', backref='user', lazy=True, cascade='all, delete-orphan')
