@@ -13,7 +13,7 @@ from src.routes.tasks import tasks_bp
 from src.routes.stakeholders import stakeholders_bp
 from src.routes.notes import notes_bp
 from datetime import timedelta
-from flask_limiter import Limiter
+from src.extensions import limiter
 from flask_limiter.util import get_remote_address
 from src.models.user import User
 from src.models.organization import Organization
@@ -34,11 +34,12 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 jwt = JWTManager(app)
 bcrypt.init_app(app)
 
-# Rate Limiting setup
+# Rate Limiting setup (no app context at import time)
 if os.environ.get('REDIS_URL'):
-    limiter = Limiter(app, key_func=get_remote_address, storage_uri=os.environ["REDIS_URL"])
+    limiter.storage_uri = os.environ['REDIS_URL']
 else:
-    limiter = Limiter(app, key_func=get_remote_address, storage_uri="memory://")
+    limiter.storage_uri = 'memory://'
+limiter.init_app(app)
 
 # CORS configuration - allow all origins in production (adjust as needed)
 allowed_origins = os.environ.get('ALLOWED_ORIGINS', '*')
