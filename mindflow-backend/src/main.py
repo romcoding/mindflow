@@ -78,9 +78,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # Import all models to ensure they're registered
-# from src.models.task import Task
-# from src.models.stakeholder import Stakeholder
-# from src.models.note import Note
+from src.models.user import User
+from src.models.task import Task
+from src.models.stakeholder import Stakeholder
+from src.models.note import Note
+from src.models.stakeholder_relationship import StakeholderRelationship, StakeholderInteraction
+from src.models.enhanced_task import EnhancedTask
 
 with app.app_context():
     db.create_all()

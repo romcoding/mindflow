@@ -157,7 +157,7 @@ def delete_relationship(relationship_id):
 
 # Stakeholder Interactions Routes
 
-@stakeholder_interactions_bp = Blueprint('stakeholder_interactions', __name__)
+stakeholder_interactions_bp = Blueprint('stakeholder_interactions', __name__)
 
 @stakeholder_interactions_bp.route('/interactions', methods=['GET'])
 @jwt_required()
