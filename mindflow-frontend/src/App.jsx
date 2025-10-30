@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
-import { Dashboard } from './components/Dashboard';
+import EnhancedDashboard from './components/EnhancedDashboard.jsx';
 import './App.css';
 // Create a client
 const queryClient = new QueryClient({
@@ -16,7 +16,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Dashboard />
+        <EnhancedDashboard />
       </AuthProvider>
     </QueryClientProvider>
   );
