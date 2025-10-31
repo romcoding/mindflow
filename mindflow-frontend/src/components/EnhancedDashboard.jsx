@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { tasksAPI, stakeholdersAPI, notesAPI } from '../lib/api.js';
+import AuthSystem from './AuthSystem.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,8 @@ import {
 } from 'lucide-react';
 
 const EnhancedDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, login, register, loading: authLoading, isAuthenticated } = useAuth();
+  const [authError, setAuthError] = useState(null);
   const [currentView, setCurrentView] = useState('dashboard');
   const [tasks, setTasks] = useState([]);
   const [stakeholders, setStakeholders] = useState([]);
@@ -74,8 +76,10 @@ const EnhancedDashboard = () => {
   const [taskView, setTaskView] = useState('kanban'); // 'kanban' or 'calendar'
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
 
   const loadData = async () => {
     try {
@@ -654,6 +658,48 @@ const EnhancedDashboard = () => {
       </div>
     </div>
   );
+
+  // Handle authentication loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-lg font-medium">Loading...</p>
+          <p className="text-gray-600">Checking authentication</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle authentication
+  const handleLogin = async (credentials) => {
+    setAuthError(null);
+    const result = await login(credentials);
+    if (!result.success) {
+      setAuthError(result.error);
+    }
+  };
+
+  const handleRegister = async (userData) => {
+    setAuthError(null);
+    const result = await register(userData);
+    if (!result.success) {
+      setAuthError(result.error);
+    }
+  };
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <AuthSystem 
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        isLoading={authLoading}
+        error={authError}
+      />
+    );
+  }
 
   if (loading) {
     return (

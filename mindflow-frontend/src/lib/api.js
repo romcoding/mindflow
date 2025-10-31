@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Base URL for the backend API. Configure in Vercel as VITE_API_BASE_URL.
-const baseURL = import.meta.env?.VITE_API_BASE_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+// Base URL for the backend API. Configure in Vercel as VITE_API_URL.
+const baseURL = import.meta.env?.VITE_API_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
 
 console.log('🔗 API Base URL:', baseURL);
 console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
@@ -15,10 +15,10 @@ const api = axios.create({
 
 // Attach access token to all requests by default
 api.interceptors.request.use((config) => {
-  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  if (accessToken) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (token) {
     config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${accessToken}`;
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
