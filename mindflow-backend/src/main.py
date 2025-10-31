@@ -14,6 +14,7 @@ from src.routes.stakeholders import stakeholders_bp
 from src.routes.notes import notes_bp
 from src.routes.enhanced_tasks import enhanced_tasks_bp
 from src.routes.stakeholder_relationships import stakeholder_relationships_bp, stakeholder_interactions_bp
+from src.routes.admin import admin_bp
 from datetime import timedelta
 from src.extensions import limiter
 from flask_limiter.util import get_remote_address
@@ -62,6 +63,7 @@ app.register_blueprint(notes_bp, url_prefix='/api')
 app.register_blueprint(enhanced_tasks_bp, url_prefix='/api')
 app.register_blueprint(stakeholder_relationships_bp, url_prefix='/api')
 app.register_blueprint(stakeholder_interactions_bp, url_prefix='/api')
+app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')
