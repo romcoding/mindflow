@@ -10,15 +10,15 @@ from src.models.stakeholder_relationship import StakeholderRelationship, Stakeho
 
 admin_bp = Blueprint('admin', __name__)
 
-@admin_bp.route('/migrate-db', methods=['POST'])
-def migrate_database():
-    """Migrate database schema - USE WITH CAUTION"""
+@admin_bp.route('/reset-db', methods=['POST'])
+def reset_database():
+    """Reset database schema - USE WITH CAUTION - This will delete all data"""
     try:
         # Drop and recreate all tables
         db.drop_all()
         db.create_all()
         
-        # Verify migration
+        # Verify reset
         inspector = db.inspect(db.engine)
         tables = inspector.get_table_names()
         
@@ -29,10 +29,10 @@ def migrate_database():
         
         return jsonify({
             'success': True,
-            'message': 'Database migration completed',
+            'message': 'Database reset completed - all data deleted and tables recreated',
             'tables_created': tables,
             'user_columns': user_columns,
-            'org_id_exists': 'org_id' in user_columns
+            'org_id_removed': 'org_id' not in user_columns
         }), 200
         
     except Exception as e:
