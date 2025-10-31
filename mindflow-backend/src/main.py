@@ -19,7 +19,7 @@ from datetime import timedelta
 from src.extensions import limiter
 from flask_limiter.util import get_remote_address
 from src.models.user import User
-from src.models.organization import Organization
+# from src.models.organization import Organization  # Temporarily disabled
 from src.models.task import Task
 from src.models.stakeholder import Stakeholder
 from src.models.note import Note
