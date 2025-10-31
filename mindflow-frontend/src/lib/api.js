@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 // Base URL for the backend API. Configure in Vercel as VITE_API_BASE_URL.
-const baseURL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL)
-  ? import.meta.env.VITE_API_BASE_URL
-  : 'https://mindflow-backend-9ec8.onrender.com/api';
+const baseURL = import.meta.env?.VITE_API_BASE_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+
+console.log('🔗 API Base URL:', baseURL);
+console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
 
 const api = axios.create({ 
   baseURL,
