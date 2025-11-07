@@ -89,6 +89,7 @@ def register():
         }), 201
     except Exception as e:
         db.session.rollback()
+        print(f"Registration failed for {data.get('email')}: {e}")
         audit_log("register", data.get("email") or data.get("username"), "fail", str(e))
         return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
 
