@@ -47,9 +47,9 @@ else:
 limiter.init_app(app)
 
 # CORS configuration - allow all origins in production (adjust as needed)
-allowed_origins = os.environ.get('ALLOWED_ORIGINS', '*')
+allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'https://mindflow-frontend-six.vercel.app').split(',')
 CORS(app, 
-     origins=allowed_origins if allowed_origins != '*' else ['*'],
+     origins=allowed_origins,
      supports_credentials=True,
      allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
