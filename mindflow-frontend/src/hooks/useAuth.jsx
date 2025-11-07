@@ -54,7 +54,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
+      console.log("Registering with:", userData);
       const response = await authAPI.register(userData);
+      console.log("Registration response:", response);
       
       // Backend returns access_token, user, and message directly
       if (response.data.access_token && response.data.user) {
