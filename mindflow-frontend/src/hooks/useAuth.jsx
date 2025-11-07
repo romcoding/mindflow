@@ -70,6 +70,16 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Registration error:', error);
+      if (error.response) {
+        console.error('Registration error response:', error.response);
+        console.error('Registration error response data:', error.response.data);
+        console.error('Registration error response status:', error.response.status);
+        console.error('Registration error response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('Registration error request:', error.request);
+      } else {
+        console.error('Registration error message:', error.message);
+      }
       return { success: false, error: error.response?.data?.error || error.response?.data?.message || 'Registration failed' };
     } finally {
       setLoading(false);
