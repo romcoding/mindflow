@@ -190,9 +190,16 @@ def health_check():
 @app.before_request
 def log_request_info():
     """Log all incoming requests for debugging"""
+    # Skip logging for health checks and static files
+    if request.path in ['/health', '/favicon.ico', '/robots.txt']:
+        return
     logger.info(f"[{request.method}] {request.path} - Origin: {request.headers.get('Origin', 'N/A')} - IP: {request.remote_addr}")
     if request.method in ['POST', 'PUT', 'PATCH']:
-        logger.info(f"Request body: {request.get_data(as_text=True)[:500]}")  # Log first 500 chars
+        try:
+            body = request.get_data(as_text=True)
+            logger.info(f"Request body: {body[:500]}")  # Log first 500 chars
+        except Exception:
+            pass
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

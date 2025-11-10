@@ -45,8 +45,11 @@ def validate_password(password):
         return False, "Password must contain at least one number"
     return True, "Password is valid"
 
-@auth_bp.route('/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST', 'OPTIONS'])
 def register():
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     try:
         data = request.get_json()
         # Accept either 'username' or 'name' field, generate username if needed
