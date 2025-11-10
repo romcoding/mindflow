@@ -1,11 +1,13 @@
 import os
 import sys
+import time
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from sqlalchemy.exc import OperationalError
 from src.models.db import db, bcrypt
 from src.routes.user import user_bp
 from src.routes.auth import auth_bp
@@ -71,12 +73,22 @@ if database_url:
     # Production: Use PostgreSQL
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"{database_url}?sslmode=require"
+
+    if 'sslmode=' not in database_url:
+        separator = '&' if '?' in database_url else '?'
+        database_url = f"{database_url}{separator}sslmode=require"
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
     # Development: Use SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {})
+app.config['SQLALCHEMY_ENGINE_OPTIONS'].update({
+    'pool_pre_ping': True,
+    'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300))
+})
 db.init_app(app)
 
 # Import all models to ensure they're registered
@@ -87,8 +99,29 @@ from src.models.note import Note
 from src.models.stakeholder_relationship import StakeholderRelationship, StakeholderInteraction
 from src.models.enhanced_task import EnhancedTask
 
-with app.app_context():
-    db.create_all()
+def initialize_database(max_retries=5, base_delay_seconds=2):
+    """Create database tables with simple retry logic for transient failures."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            with app.app_context():
+                db.create_all()
+            break
+        except OperationalError as exc:
+            app.logger.error(
+                "Database initialization failed (attempt %s/%s): %s",
+                attempt,
+                max_retries,
+                exc,
+            )
+            if attempt == max_retries:
+                raise
+            time.sleep(base_delay_seconds * attempt)
+        except Exception as exc:
+            app.logger.exception("Unexpected error during database initialization")
+            raise
+
+
+initialize_database()
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
