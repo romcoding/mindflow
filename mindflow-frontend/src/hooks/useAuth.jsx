@@ -9,34 +9,110 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
+  // Initialize auth state from localStorage (blended approach)
   useEffect(() => {
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        if (decoded.exp * 1000 > Date.now()) {
-          setUser(decoded);
-        } else {
+    const initializeAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      const storedRefreshToken = localStorage.getItem('refresh_token');
+      
+      if (storedToken) {
+        try {
+          const decoded = jwtDecode(storedToken);
+          // Check if token is expired
+          if (decoded.exp * 1000 > Date.now()) {
+            // Use stored user object if available, otherwise fall back to JWT claims
+            if (storedUser) {
+              try {
+                const userData = JSON.parse(storedUser);
+                setUser(userData);
+              } catch (e) {
+                // Fallback to JWT claims if stored user is invalid
+                setUser({
+                  id: decoded.sub || decoded.identity,
+                  username: decoded.username,
+                  email: decoded.email,
+                  first_name: decoded.first_name,
+                  last_name: decoded.last_name,
+                  name: `${decoded.first_name || ''} ${decoded.last_name || ''}`.trim() || decoded.username
+                });
+              }
+            } else {
+              // Use JWT claims as fallback
+              setUser({
+                id: decoded.sub || decoded.identity,
+                username: decoded.username,
+                email: decoded.email,
+                first_name: decoded.first_name,
+                last_name: decoded.last_name,
+                name: `${decoded.first_name || ''} ${decoded.last_name || ''}`.trim() || decoded.username
+              });
+            }
+            setToken(storedToken);
+          } else {
+            // Token expired, try to refresh if refresh token exists
+            if (storedRefreshToken) {
+              try {
+                const response = await authAPI.refreshToken();
+                if (response.data.success && response.data.access_token) {
+                  const { access_token: newToken, user: userData } = response.data;
+                  localStorage.setItem('token', newToken);
+                  if (userData) {
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    setUser(userData);
+                  }
+                  setToken(newToken);
+                } else {
+                  throw new Error('Refresh failed');
+                }
+              } catch (refreshError) {
+                // Refresh failed, clear everything
+                console.error('Token refresh failed:', refreshError);
+                localStorage.removeItem('token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+                setToken(null);
+                setUser(null);
+              }
+            } else {
+              // No refresh token, clear everything
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              setToken(null);
+              setUser(null);
+            }
+          }
+        } catch (error) {
+          console.error('Invalid token:', error);
           localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
           setToken(null);
+          setUser(null);
         }
-      } catch (error) {
-        console.error('Invalid token:', error);
-        localStorage.removeItem('token');
-        setToken(null);
       }
-    }
-    setLoading(false);
-  }, [token]);
+      setLoading(false);
+    };
+    
+    initializeAuth();
+  }, []);
 
   const login = async (credentials) => {
     try {
       setLoading(true);
       const response = await authAPI.login(credentials);
       
-      // Backend returns access_token, user, and message directly
+      // Backend returns access_token, refresh_token, user, and message
       if (response.data.access_token && response.data.user) {
-        const { access_token: newToken, user: userData } = response.data;
+        const { access_token: newToken, refresh_token: newRefreshToken, user: userData } = response.data;
+        
+        // Store tokens and full user object (blended approach)
         localStorage.setItem('token', newToken);
+        if (newRefreshToken) {
+          localStorage.setItem('refresh_token', newRefreshToken);
+        }
+        localStorage.setItem('user', JSON.stringify(userData));
+        
         setToken(newToken);
         setUser(userData);
         return { success: true, user: userData };
@@ -58,10 +134,17 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register(userData);
       console.log("Registration response:", response);
       
-      // Backend returns access_token, user, and message directly
+      // Backend returns access_token, refresh_token, user, and message
       if (response.data.access_token && response.data.user) {
-        const { access_token: newToken, user: newUser } = response.data;
+        const { access_token: newToken, refresh_token: newRefreshToken, user: newUser } = response.data;
+        
+        // Store tokens and full user object (blended approach)
         localStorage.setItem('token', newToken);
+        if (newRefreshToken) {
+          localStorage.setItem('refresh_token', newRefreshToken);
+        }
+        localStorage.setItem('user', JSON.stringify(newUser));
+        
         setToken(newToken);
         setUser(newUser);
         return { success: true, user: newUser };
@@ -88,6 +171,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
     setToken(null);
     setUser(null);
   };
@@ -95,15 +180,17 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     try {
       const response = await authAPI.updateProfile(profileData);
-      if (response.data.success) {
+      if (response.data.success && response.data.user) {
+        // Update stored user object
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         setUser(response.data.user);
         return { success: true, user: response.data.user };
       } else {
-        return { success: false, error: response.data.message };
+        return { success: false, error: response.data.message || response.data.error || 'Profile update failed' };
       }
     } catch (error) {
       console.error('Profile update error:', error);
-      return { success: false, error: error.response?.data?.message || 'Profile update failed' };
+      return { success: false, error: error.response?.data?.error || error.response?.data?.message || 'Profile update failed' };
     }
   };
 
@@ -120,9 +207,15 @@ export const AuthProvider = ({ children }) => {
   const refreshToken = async () => {
     try {
       const response = await authAPI.refreshToken();
-      if (response.data.success) {
-        const { token: newToken } = response.data;
+      if (response.data.success && response.data.access_token) {
+        const { access_token: newToken, user: userData } = response.data;
+        
+        // Update stored token and user object
         localStorage.setItem('token', newToken);
+        if (userData) {
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        }
         setToken(newToken);
         return { success: true };
       } else {

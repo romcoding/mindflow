@@ -362,7 +362,9 @@ const EnhancedDashboard = () => {
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.name}!</h2>
+            <h2 className="text-2xl font-bold mb-2">
+              Welcome back, {user?.first_name || user?.username || 'User'}!
+            </h2>
             <p className="text-blue-100">Here's what's happening with your productivity today.</p>
           </div>
           <div className="hidden md:block">

@@ -170,7 +170,11 @@ const AuthSystem = ({ onLogin, onRegister, isLoading = false, error = null }) =>
   const handleLogin = (e) => {
     e.preventDefault();
     if (validateLoginForm()) {
-      onLogin(loginForm);
+      // Map email to username field for backend compatibility
+      onLogin({
+        email: loginForm.email,
+        password: loginForm.password
+      });
     }
   };
 

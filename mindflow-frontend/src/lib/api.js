@@ -23,10 +23,10 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Better error handling interceptor
+// Better error handling interceptor with token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response) {
       // Server responded with error
       const status = error.response.status;
@@ -36,7 +36,34 @@ api.interceptors.response.use(
       
       // Handle 401 - Unauthorized (token expired/invalid)
       if (status === 401 && !error.config.url.includes('/auth/')) {
-        // Don't handle auth endpoint errors here
+        // Try to refresh token if we have a refresh token
+        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+        if (refreshToken && !error.config._retry) {
+          error.config._retry = true;
+          try {
+            const refreshResponse = await api.post('/auth/refresh', {}, {
+              headers: { Authorization: `Bearer ${refreshToken}` }
+            });
+            if (refreshResponse.data.access_token) {
+              const newToken = refreshResponse.data.access_token;
+              localStorage.setItem('token', newToken);
+              if (refreshResponse.data.user) {
+                localStorage.setItem('user', JSON.stringify(refreshResponse.data.user));
+              }
+              // Retry original request with new token
+              error.config.headers.Authorization = `Bearer ${newToken}`;
+              return api(error.config);
+            }
+          } catch (refreshError) {
+            // Refresh failed, clear tokens and redirect to login
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('refresh_token');
+              localStorage.removeItem('user');
+              window.location.reload();
+            }
+          }
+        }
       }
     } else if (error.request) {
       // Request made but no response
@@ -61,12 +88,16 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   // Use refresh token explicitly for this call
-  refresh: () => {
+  refreshToken: () => {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+    if (!refreshToken) {
+      return Promise.reject(new Error('No refresh token available'));
+    }
     return api.post('/auth/refresh', {}, {
-      headers: refreshToken ? { Authorization: `Bearer ${refreshToken}` } : {}
+      headers: { Authorization: `Bearer ${refreshToken}` }
     });
   },
+  getProfile: () => api.get('/auth/profile'),
   updateProfile: (profileData) => api.put('/auth/profile', profileData),
   changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
 };
