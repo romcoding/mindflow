@@ -6,11 +6,13 @@ import logging
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request, jsonify
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from sqlalchemy.exc import OperationalError
+from sqlalchemy import text
 from src.models.db import db, bcrypt
+from datetime import datetime
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +57,9 @@ else:
 limiter.init_app(app)
 
 # CORS configuration - allow all origins in production (adjust as needed)
-allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'https://mindflow-frontend-six.vercel.app').split(',')
+allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', 'https://mindflow-frontend-six.vercel.app')
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
+logger.info(f"CORS allowed origins: {allowed_origins}")
 CORS(app, 
      origins=allowed_origins,
      supports_credentials=True,
@@ -163,6 +167,32 @@ except Exception as e:
     logger.warning("Database not immediately available, will retry in background: %s", str(e)[:200])
     # Start background initialization
     initialize_database_async()
+
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Test database connection
+        with app.app_context():
+            db.session.execute(text('SELECT 1'))
+        db_status = 'connected'
+    except Exception as e:
+        db_status = f'error: {str(e)[:100]}'
+    
+    return jsonify({
+        'status': 'ok',
+        'database': db_status,
+        'timestamp': datetime.utcnow().isoformat()
+    }), 200
+
+# Request logging middleware
+@app.before_request
+def log_request_info():
+    """Log all incoming requests for debugging"""
+    logger.info(f"[{request.method}] {request.path} - Origin: {request.headers.get('Origin', 'N/A')} - IP: {request.remote_addr}")
+    if request.method in ['POST', 'PUT', 'PATCH']:
+        logger.info(f"Request body: {request.get_data(as_text=True)[:500]}")  # Log first 500 chars
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
