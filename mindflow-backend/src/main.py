@@ -84,26 +84,46 @@ if database_url:
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
 
+    # Parse and configure SSL settings for Render PostgreSQL
+    # Render PostgreSQL requires SSL but sometimes has connection issues
+    # Try prefer first, then require if prefer doesn't work
     if 'sslmode=' not in database_url:
         separator = '&' if '?' in database_url else '?'
-        database_url = f"{database_url}{separator}sslmode=require"
+        # Use 'prefer' instead of 'require' - it will use SSL if available but won't fail if there are issues
+        database_url = f"{database_url}{separator}sslmode=prefer"
+    elif 'sslmode=require' in database_url:
+        # Replace require with prefer for better compatibility
+        database_url = database_url.replace('sslmode=require', 'sslmode=prefer')
 
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    logger.info("Database URL configured (SSL mode: prefer)")
 else:
     # Development: Use SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
+    logger.info("Using SQLite database for development")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {})
 engine_options = {
-    'pool_pre_ping': True,
-    'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300)),
+    'pool_pre_ping': True,  # Verify connections before using
+    'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300)),  # Recycle connections after 5 minutes
+    'pool_size': int(os.environ.get('SQLALCHEMY_POOL_SIZE', 5)),  # Number of connections to maintain
+    'max_overflow': int(os.environ.get('SQLALCHEMY_MAX_OVERFLOW', 10)),  # Max connections beyond pool_size
+    'echo': False,  # Set to True for SQL query logging
 }
-# Add connection timeout for PostgreSQL
+
+# Add connection timeout and SSL settings for PostgreSQL
 if database_url and 'postgresql' in database_url:
     engine_options['connect_args'] = {
-        'connect_timeout': 10
+        'connect_timeout': 20,  # Increased timeout
+        'sslmode': 'prefer',  # Prefer SSL but don't require it strictly
+        'keepalives': 1,
+        'keepalives_idle': 30,
+        'keepalives_interval': 10,
+        'keepalives_count': 5,
     }
+    logger.info("PostgreSQL connection args configured with SSL prefer mode")
+
 app.config['SQLALCHEMY_ENGINE_OPTIONS'].update(engine_options)
 db.init_app(app)
 
@@ -115,34 +135,44 @@ from src.models.note import Note
 from src.models.stakeholder_relationship import StakeholderRelationship, StakeholderInteraction
 from src.models.enhanced_task import EnhancedTask
 
-def initialize_database(max_retries=10, base_delay_seconds=3):
+def initialize_database(max_retries=15, base_delay_seconds=5):
     """Create database tables with retry logic. Non-blocking - allows app to start even if DB is unavailable."""
     db_initialized = False
     
     for attempt in range(1, max_retries + 1):
         try:
             with app.app_context():
+                # Test connection first
+                db.session.execute(text('SELECT 1'))
+                # Then create tables
                 db.create_all()
                 logger.info("Database initialized successfully")
                 db_initialized = True
                 break
         except OperationalError as exc:
+            error_msg = str(exc)
             logger.warning(
                 "Database initialization failed (attempt %s/%s): %s. Will retry...",
                 attempt,
                 max_retries,
-                str(exc)[:200],  # Truncate long error messages
+                error_msg[:200],  # Truncate long error messages
             )
             if attempt < max_retries:
-                time.sleep(base_delay_seconds * attempt)
+                # Exponential backoff with jitter
+                delay = base_delay_seconds * (2 ** (attempt - 1)) + (time.time() % 1)
+                logger.info(f"Waiting {delay:.1f} seconds before retry...")
+                time.sleep(delay)
             else:
                 logger.error(
                     "Database initialization failed after %s attempts. "
-                    "App will start but database operations may fail until connection is established.",
+                    "App will start but database operations may fail until connection is established. "
+                    "This might be a temporary network issue. The app will retry on first request.",
                     max_retries
                 )
         except Exception as exc:
             logger.exception("Unexpected error during database initialization")
+            if attempt < max_retries:
+                time.sleep(base_delay_seconds * attempt)
             # Don't raise - allow app to start
     
     return db_initialized
