@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from src.models.user import User, db
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from datetime import timedelta
 import re
 import logging
@@ -56,6 +57,26 @@ def register():
         email = data['email'].strip().lower()
         password = data['password']
         
+        # Validate email and password first (before database queries)
+        if not validate_email(email):
+            audit_log("register", email, "fail", "invalid email format")
+            return jsonify({'error': 'Invalid email format'}), 400
+        is_valid, message = validate_password(password)
+        if not is_valid:
+            audit_log("register", email, "fail", message)
+            return jsonify({'error': message}), 400
+        
+        # Check database connection before proceeding
+        try:
+            # Test database connection by attempting a simple query
+            User.query.limit(1).all()
+        except (OperationalError, SQLAlchemyError) as db_error:
+            audit_log("register", email, "fail", f"database connection error: {str(db_error)}")
+            return jsonify({
+                'error': 'Database connection error',
+                'message': 'Unable to connect to database. Please try again in a moment.'
+            }), 503
+        
         # Generate username from name if provided, otherwise from email
         if data.get('username'):
             username = data['username'].strip()
@@ -68,23 +89,20 @@ def register():
             # Ensure username is unique
             username = username_base
             counter = 1
-            while User.query.filter_by(username=username).first():
+            max_attempts = 100  # Prevent infinite loop
+            while counter < max_attempts and User.query.filter_by(username=username).first():
                 username = f"{username_base}{counter}"
                 counter += 1
         else:
             # Generate from email
             username = email.split('@')[0]
             counter = 1
-            while User.query.filter_by(username=username).first():
+            max_attempts = 100  # Prevent infinite loop
+            while counter < max_attempts and User.query.filter_by(username=username).first():
                 username = f"{email.split('@')[0]}{counter}"
                 counter += 1
-        if not validate_email(email):
-            audit_log("register", email, "fail", "invalid email format")
-            return jsonify({'error': 'Invalid email format'}), 400
-        is_valid, message = validate_password(password)
-        if not is_valid:
-            audit_log("register", email, "fail", message)
-            return jsonify({'error': message}), 400
+        
+        # Check if username or email already exists
         if User.query.filter_by(username=username).first():
             audit_log("register", email, "fail", "username exists")
             return jsonify({'error': 'Username already exists'}), 400
@@ -137,11 +155,30 @@ def register():
             'access_token': access_token,
             'refresh_token': refresh_token
         }), 201
+    except (OperationalError, SQLAlchemyError) as db_error:
+        db.session.rollback()
+        error_message = str(db_error)
+        print(f"Database error during registration for {data.get('email')}: {error_message}")
+        import traceback
+        print(traceback.format_exc())
+        audit_log("register", data.get("email") or data.get("name"), "fail", f"database error: {error_message}")
+        return jsonify({
+            'error': 'Database error',
+            'message': 'Unable to complete registration due to database error. Please try again.'
+        }), 503
     except Exception as e:
         db.session.rollback()
-        print(f"Registration failed for {data.get('email')}: {e}")
-        audit_log("register", data.get("email") or data.get("username"), "fail", str(e))
-        return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
+        error_message = str(e)
+        print(f"Registration failed for {data.get('email')}: {error_message}")
+        import traceback
+        print(traceback.format_exc())
+        audit_log("register", data.get("email") or data.get("name"), "fail", error_message)
+        # Return more detailed error for debugging
+        return jsonify({
+            'error': 'Registration failed',
+            'message': error_message,
+            'details': error_message
+        }), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():

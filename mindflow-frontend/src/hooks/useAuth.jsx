@@ -149,7 +149,10 @@ export const AuthProvider = ({ children }) => {
         setUser(newUser);
         return { success: true, user: newUser };
       } else {
-        return { success: false, error: response.data.error || response.data.message || 'Registration failed' };
+        // Handle error response from backend
+        const errorMsg = response.data.error || response.data.message || response.data.details || 'Registration failed';
+        console.error('Registration failed:', response.data);
+        return { success: false, error: errorMsg };
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -157,13 +160,19 @@ export const AuthProvider = ({ children }) => {
         console.error('Registration error response:', error.response);
         console.error('Registration error response data:', error.response.data);
         console.error('Registration error response status:', error.response.status);
-        console.error('Registration error response headers:', error.response.headers);
+        // Extract error message from response
+        const errorMsg = error.response.data?.error || 
+                        error.response.data?.message || 
+                        error.response.data?.details || 
+                        `Registration failed (${error.response.status})`;
+        return { success: false, error: errorMsg };
       } else if (error.request) {
         console.error('Registration error request:', error.request);
+        return { success: false, error: 'Network error. Please check your connection and try again.' };
       } else {
         console.error('Registration error message:', error.message);
+        return { success: false, error: error.message || 'Registration failed' };
       }
-      return { success: false, error: error.response?.data?.error || error.response?.data?.message || 'Registration failed' };
     } finally {
       setLoading(false);
     }
