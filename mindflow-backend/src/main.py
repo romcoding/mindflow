@@ -1,6 +1,8 @@
 import os
 import sys
 import time
+import threading
+import logging
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -9,6 +11,10 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from sqlalchemy.exc import OperationalError
 from src.models.db import db, bcrypt
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 from src.routes.user import user_bp
 from src.routes.auth import auth_bp
 from src.routes.tasks import tasks_bp
@@ -85,10 +91,16 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {})
-app.config['SQLALCHEMY_ENGINE_OPTIONS'].update({
+engine_options = {
     'pool_pre_ping': True,
-    'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300))
-})
+    'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300)),
+}
+# Add connection timeout for PostgreSQL
+if database_url and 'postgresql' in database_url:
+    engine_options['connect_args'] = {
+        'connect_timeout': 10
+    }
+app.config['SQLALCHEMY_ENGINE_OPTIONS'].update(engine_options)
 db.init_app(app)
 
 # Import all models to ensure they're registered
@@ -99,29 +111,58 @@ from src.models.note import Note
 from src.models.stakeholder_relationship import StakeholderRelationship, StakeholderInteraction
 from src.models.enhanced_task import EnhancedTask
 
-def initialize_database(max_retries=5, base_delay_seconds=2):
-    """Create database tables with simple retry logic for transient failures."""
+def initialize_database(max_retries=10, base_delay_seconds=3):
+    """Create database tables with retry logic. Non-blocking - allows app to start even if DB is unavailable."""
+    db_initialized = False
+    
     for attempt in range(1, max_retries + 1):
         try:
             with app.app_context():
                 db.create_all()
-            break
+                logger.info("Database initialized successfully")
+                db_initialized = True
+                break
         except OperationalError as exc:
-            app.logger.error(
-                "Database initialization failed (attempt %s/%s): %s",
+            logger.warning(
+                "Database initialization failed (attempt %s/%s): %s. Will retry...",
                 attempt,
                 max_retries,
-                exc,
+                str(exc)[:200],  # Truncate long error messages
             )
-            if attempt == max_retries:
-                raise
-            time.sleep(base_delay_seconds * attempt)
+            if attempt < max_retries:
+                time.sleep(base_delay_seconds * attempt)
+            else:
+                logger.error(
+                    "Database initialization failed after %s attempts. "
+                    "App will start but database operations may fail until connection is established.",
+                    max_retries
+                )
         except Exception as exc:
-            app.logger.exception("Unexpected error during database initialization")
-            raise
+            logger.exception("Unexpected error during database initialization")
+            # Don't raise - allow app to start
+    
+    return db_initialized
 
+# Initialize database in background thread to avoid blocking app startup
+def initialize_database_async():
+    """Initialize database asynchronously to avoid blocking app startup."""
+    def init_thread():
+        time.sleep(2)  # Give the app a moment to fully start
+        initialize_database()
+    
+    thread = threading.Thread(target=init_thread, daemon=True)
+    thread.start()
+    logger.info("Database initialization started in background thread")
 
-initialize_database()
+# Try to initialize immediately, but don't block if it fails
+try:
+    with app.app_context():
+        db.create_all()
+        logger.info("Database initialized successfully on startup")
+except Exception as e:
+    logger.warning("Database not immediately available, will retry in background: %s", str(e)[:200])
+    # Start background initialization
+    initialize_database_async()
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
