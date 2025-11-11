@@ -56,15 +56,30 @@ else:
     limiter.storage_uri = 'memory://'
 limiter.init_app(app)
 
-# CORS configuration - allow all origins in production (adjust as needed)
-allowed_origins_env = os.environ.get('ALLOWED_ORIGINS', 'https://mindflow-frontend-six.vercel.app')
-allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',')]
-logger.info(f"CORS allowed origins: {allowed_origins}")
-CORS(app, 
-     origins=allowed_origins,
-     supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
+# CORS configuration - allow configurable origins (defaults to allow all)
+allowed_origins_env = os.environ.get('ALLOWED_ORIGINS')
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',') if origin.strip()]
+    supports_credentials = os.environ.get('ALLOW_CREDENTIALS', 'false').lower() == 'true'
+    logger.info(f"CORS allowed origins (env): {allowed_origins} | supports_credentials={supports_credentials}")
+    CORS(
+        app,
+        origins=allowed_origins,
+        supports_credentials=supports_credentials,
+        allow_headers=['Content-Type', 'Authorization'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        max_age=86400
+    )
+else:
+    # Allow all origins by default (no cookies used, tokens handled in headers)
+    logger.info("CORS: allowing all origins (no ALLOWED_ORIGINS env set)")
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        allow_headers=['Content-Type', 'Authorization'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        max_age=86400
+    )
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
