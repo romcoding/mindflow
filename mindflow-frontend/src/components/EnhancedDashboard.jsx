@@ -81,6 +81,74 @@ const EnhancedDashboard = () => {
     }
   }, [isAuthenticated]);
 
+  // Handle OAuth callback
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const error = urlParams.get('error');
+      
+      if (error) {
+        let errorMessage = 'OAuth authentication failed';
+        switch (error) {
+          case 'invalid_state':
+            errorMessage = 'Security validation failed. Please try again.';
+            break;
+          case 'no_code':
+            errorMessage = 'Authorization was cancelled or failed.';
+            break;
+          case 'no_email':
+            errorMessage = 'Could not retrieve email from OAuth provider.';
+            break;
+          case 'account_deactivated':
+            errorMessage = 'Your account has been deactivated.';
+            break;
+          case 'oauth_request_failed':
+            errorMessage = 'Failed to communicate with OAuth provider.';
+            break;
+          case 'oauth_callback_failed':
+            errorMessage = 'OAuth callback processing failed.';
+            break;
+          default:
+            errorMessage = `OAuth authentication failed: ${error}`;
+        }
+        setAuthError(errorMessage);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+      
+      if (token) {
+        try {
+          // Decode the token data (URL-safe base64)
+          const tokenData = JSON.parse(atob(token.replace(/-/g, '+').replace(/_/g, '/')));
+          
+          if (tokenData.access_token && tokenData.user) {
+            // Store tokens and user data
+            localStorage.setItem('token', tokenData.access_token);
+            if (tokenData.refresh_token) {
+              localStorage.setItem('refresh_token', tokenData.refresh_token);
+            }
+            localStorage.setItem('user', JSON.stringify(tokenData.user));
+            
+            // Reload to update auth state
+            window.location.href = window.location.pathname;
+          }
+        } catch (err) {
+          console.error('OAuth callback error:', err);
+          setAuthError('Failed to process OAuth callback. Please try again.');
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+    
+    // Only handle OAuth callback if not authenticated
+    if (!isAuthenticated) {
+      handleOAuthCallback();
+    }
+  }, [isAuthenticated]);
+
   const loadData = async () => {
     try {
       setLoading(true);

@@ -1,12 +1,18 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect, url_for, session
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from src.models.user import User, db
+from src.extensions import limiter
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from datetime import timedelta
 import re
 import logging
 import json
+import os
+import secrets
+import requests
+import base64
 from datetime import datetime
+from urllib.parse import quote
 
 # Setup logger just once (module level)
 audit_logger = logging.getLogger("auth_audit")
@@ -196,9 +202,25 @@ def login():
         identifier = identifier.strip()
         password = data['password']
         user = User.query.filter((User.username == identifier) | (User.email == identifier.lower())).first()
-        if not user or not user.check_password(password):
+        
+        # Check if user exists
+        if not user:
+            audit_log("login", identifier, "fail", "user not found")
+            return jsonify({'error': 'Invalid credentials'}), 401
+        
+        # Check if user is OAuth-only (no password)
+        if user.oauth_provider and not user.password_hash:
+            audit_log("login", identifier, "fail", "oauth-only account")
+            return jsonify({
+                'error': 'This account was created with OAuth. Please sign in with your OAuth provider.',
+                'oauth_provider': user.oauth_provider
+            }), 401
+        
+        # Check password
+        if not user.check_password(password):
             audit_log("login", identifier, "fail", "invalid credentials")
             return jsonify({'error': 'Invalid credentials'}), 401
+        
         if not user.is_active:
             audit_log("login", identifier, "fail", "account deactivated")
             return jsonify({'error': 'Account is deactivated'}), 401
@@ -356,3 +378,230 @@ def change_password():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to change password', 'details': str(e)}), 500
+
+# OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
+
+# Get frontend URL for redirects
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+
+def generate_state():
+    """Generate a secure random state for OAuth"""
+    return secrets.token_urlsafe(32)
+
+@auth_bp.route('/oauth/<provider>/authorize', methods=['GET'])
+@limiter.limit("10 per minute")
+def oauth_authorize(provider):
+    """Initiate OAuth flow - redirects to provider"""
+    try:
+        # Generate secure state token
+        state = generate_state()
+        session[f'oauth_{provider}_state'] = state
+        
+        if provider == 'google':
+            if not GOOGLE_CLIENT_ID:
+                return jsonify({'error': 'Google OAuth not configured'}), 500
+            
+            # Use request.url_root to get the full base URL
+            base_url = request.url_root.rstrip('/')
+            redirect_uri = f"{base_url}/api/auth/oauth/google/callback"
+            scope = 'openid email profile'
+            auth_url = (
+                f"https://accounts.google.com/o/oauth2/v2/auth?"
+                f"client_id={GOOGLE_CLIENT_ID}&"
+                f"redirect_uri={redirect_uri}&"
+                f"response_type=code&"
+                f"scope={scope}&"
+                f"state={state}&"
+                f"access_type=online"
+            )
+            return redirect(auth_url)
+        
+        elif provider == 'github':
+            if not GITHUB_CLIENT_ID:
+                return jsonify({'error': 'GitHub OAuth not configured'}), 500
+            
+            # Use request.url_root to get the full base URL
+            base_url = request.url_root.rstrip('/')
+            redirect_uri = f"{base_url}/api/auth/oauth/github/callback"
+            scope = 'user:email'
+            auth_url = (
+                f"https://github.com/login/oauth/authorize?"
+                f"client_id={GITHUB_CLIENT_ID}&"
+                f"redirect_uri={redirect_uri}&"
+                f"scope={scope}&"
+                f"state={state}"
+            )
+            return redirect(auth_url)
+        
+        else:
+            return jsonify({'error': 'Unsupported OAuth provider'}), 400
+    
+    except Exception as e:
+        logging.error(f"OAuth authorization error: {str(e)}")
+        return jsonify({'error': 'OAuth authorization failed', 'details': str(e)}), 500
+
+@auth_bp.route('/oauth/<provider>/callback', methods=['GET'])
+@limiter.limit("20 per minute")
+def oauth_callback(provider):
+    """Handle OAuth callback from provider"""
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        error = request.args.get('error')
+        
+        if error:
+            error_msg = quote(error, safe='')
+            return redirect(f"{FRONTEND_URL}?error={error_msg}")
+        
+        # Verify state
+        stored_state = session.get(f'oauth_{provider}_state')
+        if not stored_state or stored_state != state:
+            return redirect(f"{FRONTEND_URL}?error=invalid_state")
+        
+        # Clear state from session
+        session.pop(f'oauth_{provider}_state', None)
+        
+        if not code:
+            return redirect(f"{FRONTEND_URL}?error=no_code")
+        
+        # Exchange code for access token
+        if provider == 'google':
+            token_url = 'https://oauth2.googleapis.com/token'
+            base_url = request.url_root.rstrip('/')
+            token_data = {
+                'code': code,
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': GOOGLE_CLIENT_SECRET,
+                'redirect_uri': f"{base_url}/api/auth/oauth/google/callback",
+                'grant_type': 'authorization_code'
+            }
+            token_response = requests.post(token_url, data=token_data)
+            token_response.raise_for_status()
+            tokens = token_response.json()
+            access_token = tokens.get('access_token')
+            
+            # Get user info from Google
+            user_info_url = 'https://www.googleapis.com/oauth2/v2/userinfo'
+            headers = {'Authorization': f'Bearer {access_token}'}
+            user_response = requests.get(user_info_url, headers=headers)
+            user_response.raise_for_status()
+            user_info = user_response.json()
+            
+            # Extract user data
+            email = user_info.get('email')
+            first_name = user_info.get('given_name')
+            last_name = user_info.get('family_name')
+            provider_id = user_info.get('id')
+            avatar_url = user_info.get('picture')
+            username = user_info.get('name', email.split('@')[0] if email else 'user')
+            
+        elif provider == 'github':
+            token_url = 'https://github.com/login/oauth/access_token'
+            base_url = request.url_root.rstrip('/')
+            token_data = {
+                'code': code,
+                'client_id': GITHUB_CLIENT_ID,
+                'client_secret': GITHUB_CLIENT_SECRET,
+                'redirect_uri': f"{base_url}/api/auth/oauth/github/callback"
+            }
+            headers = {'Accept': 'application/json'}
+            token_response = requests.post(token_url, data=token_data, headers=headers)
+            token_response.raise_for_status()
+            tokens = token_response.json()
+            access_token = tokens.get('access_token')
+            
+            # Get user info from GitHub
+            user_info_url = 'https://api.github.com/user'
+            headers = {'Authorization': f'token {access_token}', 'Accept': 'application/vnd.github.v3+json'}
+            user_response = requests.get(user_info_url, headers=headers)
+            user_response.raise_for_status()
+            user_info = user_response.json()
+            
+            # Get email (may need separate call)
+            email = user_info.get('email')
+            if not email:
+                # Try to get primary email
+                emails_url = 'https://api.github.com/user/emails'
+                emails_response = requests.get(emails_url, headers=headers)
+                if emails_response.status_code == 200:
+                    emails = emails_response.json()
+                    primary_email = next((e for e in emails if e.get('primary')), emails[0] if emails else None)
+                    email = primary_email.get('email') if primary_email else None
+            
+            # Extract user data
+            name = user_info.get('name', '')
+            name_parts = name.split() if name else []
+            first_name = name_parts[0] if name_parts else None
+            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else None
+            provider_id = str(user_info.get('id'))
+            avatar_url = user_info.get('avatar_url')
+            username = user_info.get('login', email.split('@')[0] if email else 'user')
+        
+        else:
+            return redirect(f"{FRONTEND_URL}?error=unsupported_provider")
+        
+        if not email:
+            return redirect(f"{FRONTEND_URL}?error=no_email")
+        
+        # Find or create user
+        user = User.find_or_create_oauth_user(
+            provider=provider,
+            provider_id=provider_id,
+            email=email.lower(),
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            avatar_url=avatar_url
+        )
+        
+        if not user.is_active:
+            return redirect(f"{FRONTEND_URL}?error=account_deactivated")
+        
+        # Create JWT tokens
+        additional_claims = {
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name
+        }
+        access_token_jwt = create_access_token(
+            identity=user.id,
+            additional_claims=additional_claims,
+            expires_delta=timedelta(hours=24)
+        )
+        refresh_token_jwt = create_refresh_token(
+            identity=user.id,
+            additional_claims=additional_claims,
+            expires_delta=timedelta(days=30)
+        )
+        
+        audit_log("oauth_login", email, "success", f"provider={provider}")
+        
+        # Redirect to frontend with tokens in URL fragment (more secure than query params)
+        # Frontend will extract tokens and store them
+        tokens_encoded = base64.urlsafe_b64encode(
+            json.dumps({
+                'access_token': access_token_jwt,
+                'refresh_token': refresh_token_jwt,
+                'user': user.to_dict()
+            }).encode()
+        ).decode()
+        
+        # URL encode the token to handle special characters
+        tokens_encoded = quote(tokens_encoded, safe='')
+        return redirect(f"{FRONTEND_URL}?token={tokens_encoded}")
+    
+    except requests.RequestException as e:
+        logging.error(f"OAuth callback request error: {str(e)}")
+        error_msg = quote("oauth_request_failed", safe='')
+        return redirect(f"{FRONTEND_URL}?error={error_msg}")
+    except Exception as e:
+        logging.error(f"OAuth callback error: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
+        error_msg = quote("oauth_callback_failed", safe='')
+        return redirect(f"{FRONTEND_URL}?error={error_msg}")

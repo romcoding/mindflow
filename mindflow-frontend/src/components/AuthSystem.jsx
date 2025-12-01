@@ -56,6 +56,13 @@ const AuthSystem = ({ onLogin, onRegister, isLoading = false, error = null }) =>
 
   const [formErrors, setFormErrors] = useState({});
 
+  // Handle OAuth login
+  const handleOAuthLogin = (provider) => {
+    const apiBaseUrl = import.meta.env?.VITE_API_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+    const oauthUrl = `${apiBaseUrl}/auth/oauth/${provider}/authorize`;
+    window.location.href = oauthUrl;
+  };
+
   // Password strength calculation
   useEffect(() => {
     if (registerForm.password) {
@@ -181,10 +188,17 @@ const AuthSystem = ({ onLogin, onRegister, isLoading = false, error = null }) =>
   const handleRegister = (e) => {
     e.preventDefault();
     if (validateRegisterForm()) {
+      // Split full name into first and last name
+      const nameParts = registerForm.fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       onRegister({
         name: registerForm.fullName,
         email: registerForm.email,
-        password: registerForm.password
+        password: registerForm.password,
+        first_name: firstName,
+        last_name: lastName
       });
     }
   };
@@ -407,11 +421,23 @@ const AuthSystem = ({ onLogin, onRegister, isLoading = false, error = null }) =>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      type="button"
+                      onClick={() => handleOAuthLogin('github')}
+                      disabled={isLoading}
+                    >
                       <Github className="mr-2 h-4 w-4" />
                       GitHub
                     </Button>
-                    <Button variant="outline" className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      type="button"
+                      onClick={() => handleOAuthLogin('google')}
+                      disabled={isLoading}
+                    >
                       <Chrome className="mr-2 h-4 w-4" />
                       Google
                     </Button>
@@ -589,6 +615,38 @@ const AuthSystem = ({ onLogin, onRegister, isLoading = false, error = null }) =>
                       )}
                     </Button>
                   </form>
+
+                  <div className="relative mt-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-gray-500">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      type="button"
+                      onClick={() => handleOAuthLogin('github')}
+                      disabled={isLoading}
+                    >
+                      <Github className="mr-2 h-4 w-4" />
+                      GitHub
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      type="button"
+                      onClick={() => handleOAuthLogin('google')}
+                      disabled={isLoading}
+                    >
+                      <Chrome className="mr-2 h-4 w-4" />
+                      Google
+                    </Button>
+                  </div>
                 </TabsContent>
               </Tabs>
 

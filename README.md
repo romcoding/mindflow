@@ -9,7 +9,7 @@ A comprehensive full-stack application for managing tasks, stakeholders, and not
 - **Voice Input Integration**: Full Web Speech API implementation with real-time transcription
 - **Task Management**: Priority-based task organization with smart due date extraction
 - **Stakeholder Mapping**: Interactive relationship management with influence/interest matrix
-- **Secure Authentication**: JWT-based authentication with refresh tokens
+- **Secure Authentication**: JWT-based authentication with refresh tokens and OAuth (Google, GitHub)
 - **Responsive Design**: Works seamlessly on mobile phones and laptops
 
 ### Advanced Features
@@ -23,9 +23,9 @@ A comprehensive full-stack application for managing tasks, stakeholders, and not
 ### Backend (Flask)
 - **Framework**: Flask with SQLAlchemy ORM
 - **Database**: PostgreSQL (production) / SQLite (development)
-- **Authentication**: JWT with Flask-JWT-Extended
+- **Authentication**: JWT with Flask-JWT-Extended, OAuth 2.0 (Google, GitHub)
 - **API**: RESTful API with comprehensive endpoints
-- **Security**: Password hashing with bcrypt, CORS protection
+- **Security**: Password hashing with bcrypt, CORS protection, rate limiting, security headers
 
 ### Frontend (React)
 - **Framework**: React 19 with Vite
@@ -85,12 +85,28 @@ pnpm run dev
 SECRET_KEY=your-secret-key-here
 JWT_SECRET_KEY=your-jwt-secret-here
 DATABASE_URL=postgresql://user:password@host:port/database  # For production
+
+# OAuth (Optional - see OAUTH_SETUP.md)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+FRONTEND_URL=http://localhost:5173  # For development, use production URL in production
 ```
 
 #### Frontend (.env.local)
 ```env
 VITE_API_URL=http://localhost:5000/api  # For development
 ```
+
+## 🔐 OAuth Setup
+
+For OAuth authentication (Google and GitHub), see [OAUTH_SETUP.md](./OAUTH_SETUP.md) for detailed instructions.
+
+Quick setup:
+1. Create OAuth apps in Google Cloud Console and GitHub Developer Settings
+2. Add the OAuth credentials to your backend environment variables
+3. Configure redirect URIs to point to your backend callback endpoints
 
 ## 🚀 Deployment
 
@@ -99,7 +115,7 @@ VITE_API_URL=http://localhost:5000/api  # For development
 2. Create a new Web Service
 3. Set build command: `pip install -r mindflow-backend/requirements.txt`
 4. Set start command: `cd mindflow-backend && python src/main.py`
-5. Add environment variables (DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY)
+5. Add environment variables (DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY, OAuth credentials - see OAUTH_SETUP.md)
 
 ### Frontend (Vercel)
 1. Connect your GitHub repository to Vercel
