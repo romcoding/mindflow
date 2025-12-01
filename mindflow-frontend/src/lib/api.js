@@ -74,8 +74,8 @@ api.interceptors.response.use(
             const refreshResponse = await api.post('/auth/refresh', {}, {
               headers: { Authorization: `Bearer ${refreshToken}` }
             });
-            if (refreshResponse.data.access_token || refreshResponse.data.success) {
-              const newToken = refreshResponse.data.access_token || refreshResponse.data.access_token;
+            const newToken = refreshResponse.data.access_token;
+            if (newToken || refreshResponse.data.success) {
               if (newToken) {
                 localStorage.setItem('token', newToken);
                 if (refreshResponse.data.user) {
