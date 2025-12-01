@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -264,7 +264,17 @@ const EnhancedDashboard = () => {
       return;
     }
 
-    const analysis = type ? { ...analysisResult, type } : analyzeContent(quickAddText);
+    // Ensure we have analysis result - create it if missing
+    let analysis = analysisResult;
+    if (!analysis || (type && analysis.type !== type)) {
+      analysis = analyzeContent(quickAddText);
+      if (type) {
+        analysis = { ...analysis, type };
+      }
+      setAnalysisResult(analysis);
+    } else if (type) {
+      analysis = { ...analysis, type };
+    }
     
     try {
       if (analysis.type === 'task') {
@@ -922,6 +932,9 @@ const EnhancedDashboard = () => {
               <Brain className="h-5 w-5" />
               Quick Add - Capture Your Thoughts
             </DialogTitle>
+            <DialogDescription>
+              Type or speak your thoughts, and we'll intelligently categorize them as tasks, contacts, or notes.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1015,8 +1028,9 @@ const EnhancedDashboard = () => {
 
       {/* User Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden p-0">
-          <UserProfile
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          <div className="p-6">
+            <UserProfile
             user={user}
             onUpdateProfile={(profileData) => {
               // Handle profile update
@@ -1032,6 +1046,7 @@ const EnhancedDashboard = () => {
             }}
             onLogout={logout}
           />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
