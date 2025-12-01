@@ -213,6 +213,46 @@ def initialize_database_async():
 try:
     with app.app_context():
         db.create_all()
+        # Try to add OAuth columns if they don't exist (for existing databases)
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if 'user' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('user')]
+                required_oauth_columns = ['oauth_provider', 'oauth_provider_id', 'avatar_url']
+                missing_columns = [col for col in required_oauth_columns if col not in columns]
+                
+                if missing_columns:
+                    logger.info(f"Adding missing OAuth columns: {missing_columns}")
+                    with db.engine.connect() as conn:
+                        # PostgreSQL doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN
+                        # So we check first and only add if missing
+                        if 'oauth_provider' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN oauth_provider VARCHAR(20)'))
+                        if 'oauth_provider_id' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN oauth_provider_id VARCHAR(255)'))
+                        if 'avatar_url' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN avatar_url VARCHAR(500)'))
+                        # Make password_hash nullable if needed (PostgreSQL specific)
+                        conn.execute(text("""
+                            DO $$ 
+                            BEGIN
+                                IF EXISTS (
+                                    SELECT 1 FROM information_schema.columns 
+                                    WHERE table_name = 'user' 
+                                    AND column_name = 'password_hash' 
+                                    AND is_nullable = 'NO'
+                                ) THEN
+                                    ALTER TABLE "user" ALTER COLUMN password_hash DROP NOT NULL;
+                                END IF;
+                            END $$;
+                        """))
+                        conn.commit()
+                    logger.info("OAuth columns added successfully")
+        except Exception as migration_error:
+            logger.warning(f"Could not add OAuth columns automatically: {str(migration_error)[:200]}")
+            logger.info("You may need to run add_oauth_columns.py manually")
+        
         logger.info("Database initialized successfully on startup")
 except Exception as e:
     logger.warning("Database not immediately available, will retry in background: %s", str(e)[:200])
