@@ -3,6 +3,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token, jwt_re
 from src.models.user import User, db
 from src.extensions import limiter
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy import text
 from datetime import timedelta
 import re
 import logging
@@ -51,6 +52,32 @@ def validate_password(password):
         return False, "Password must contain at least one number"
     return True, "Password is valid"
 
+def ensure_db_connection(max_retries=3):
+    """Ensure database connection is available with retry logic.
+    Render PostgreSQL databases on free tier sleep after inactivity."""
+    for retry in range(max_retries):
+        try:
+            db.session.execute(text('SELECT 1'))
+            db.session.commit()
+            return True
+        except (OperationalError, SQLAlchemyError) as db_error:
+            if retry < max_retries - 1:
+                # Wait before retrying (database might be waking up)
+                import time
+                time.sleep(0.5 * (retry + 1))  # 0.5s, 1s, 1.5s
+                # Try to refresh the connection
+                try:
+                    db.session.rollback()
+                except:
+                    pass
+                continue
+            else:
+                # Final attempt failed
+                error_msg = str(db_error)
+                logging.error(f"Database connection failed after {max_retries} attempts: {error_msg[:200]}")
+                return False
+    return False
+
 @auth_bp.route('/register', methods=['POST', 'OPTIONS'])
 def register():
     # Handle CORS preflight
@@ -81,15 +108,13 @@ def register():
             audit_log("register", email, "fail", message)
             return jsonify({'error': message}), 400
         
-        # Check database connection before proceeding
-        try:
-            # Test database connection by attempting a simple query
-            User.query.limit(1).all()
-        except (OperationalError, SQLAlchemyError) as db_error:
-            audit_log("register", email, "fail", f"database connection error: {str(db_error)}")
+        # Check database connection before proceeding with retry logic
+        # Render PostgreSQL databases on free tier sleep after inactivity and need a moment to wake up
+        if not ensure_db_connection():
+            audit_log("register", email, "fail", "database connection failed after retries")
             return jsonify({
                 'error': 'Database connection error',
-                'message': 'Unable to connect to database. Please try again in a moment.'
+                'message': 'Unable to connect to database. The database might be waking up. Please try again in a few seconds.'
             }), 503
         
         # Generate username from name if provided, otherwise from email
@@ -210,6 +235,14 @@ def login():
         if not identifier or not data.get('password'):
             audit_log("login", identifier or "unknown", "fail", "missing username/email or password")
             return jsonify({'error': 'Username/email and password are required'}), 400
+        
+        # Check database connection before proceeding
+        if not ensure_db_connection():
+            audit_log("login", identifier, "fail", "database connection failed")
+            return jsonify({
+                'error': 'Database connection error',
+                'message': 'Unable to connect to database. The database might be waking up. Please try again in a few seconds.'
+            }), 503
         
         identifier = identifier.strip()
         password = data['password']

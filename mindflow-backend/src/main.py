@@ -125,10 +125,11 @@ else:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {})
 engine_options = {
-    'pool_pre_ping': True,  # Verify connections before using
+    'pool_pre_ping': True,  # Verify connections before using (reconnects if connection is dead)
     'pool_recycle': int(os.environ.get('SQLALCHEMY_POOL_RECYCLE_SECONDS', 300)),  # Recycle connections after 5 minutes
-    'pool_size': int(os.environ.get('SQLALCHEMY_POOL_SIZE', 5)),  # Number of connections to maintain
-    'max_overflow': int(os.environ.get('SQLALCHEMY_MAX_OVERFLOW', 10)),  # Max connections beyond pool_size
+    'pool_size': int(os.environ.get('SQLALCHEMY_POOL_SIZE', 2)),  # Reduced for free tier (Render free tier has limits)
+    'max_overflow': int(os.environ.get('SQLALCHEMY_MAX_OVERFLOW', 5)),  # Reduced for free tier
+    'pool_timeout': 30,  # Timeout for getting connection from pool
     'echo': False,  # Set to True for SQL query logging
 }
 
