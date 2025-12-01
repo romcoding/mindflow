@@ -80,9 +80,10 @@ else:
     CORS(
         app,
         resources={r"/api/*": {"origins": "*"}},
-        allow_headers=['Content-Type', 'Authorization'],
+        allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
         methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        max_age=86400
+        max_age=86400,
+        supports_credentials=False  # Explicitly set to False for token-based auth
     )
 
 # Register blueprints

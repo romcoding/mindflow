@@ -100,6 +100,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       setLoading(true);
+      console.log('🔐 Attempting login with:', { email: credentials.email, hasPassword: !!credentials.password });
       const response = await authAPI.login(credentials);
       
       // Backend returns access_token, refresh_token, user, and message
@@ -121,7 +122,13 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: error.response?.data?.error || error.response?.data?.message || 'Login failed' };
+      console.error('Login error response:', error.response);
+      console.error('Login error request:', error.request);
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Login failed. Please check your connection and try again.';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -130,7 +137,13 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      console.log("Registering with:", userData);
+      console.log("📝 Registering with:", { 
+        email: userData.email, 
+        name: userData.name,
+        hasPassword: !!userData.password,
+        first_name: userData.first_name,
+        last_name: userData.last_name
+      });
       const response = await authAPI.register(userData);
       console.log("Registration response:", response);
       
@@ -171,7 +184,10 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Network error. Please check your connection and try again.' };
       } else {
         console.error('Registration error message:', error.message);
-        return { success: false, error: error.message || 'Registration failed' };
+        console.error('Registration full error:', error);
+        const errorMessage = error.message || 
+                           (error.response?.data?.error || 'Registration failed. Please check your connection and try again.');
+        return { success: false, error: errorMessage };
       }
     } finally {
       setLoading(false);

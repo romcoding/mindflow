@@ -58,6 +58,12 @@ def register():
         return jsonify({'status': 'ok'}), 200
     try:
         data = request.get_json()
+        if not data:
+            audit_log("register", "unknown", "fail", "no JSON data received")
+            return jsonify({'error': 'Invalid request: No data received'}), 400
+        
+        logging.info(f"Registration attempt for email: {data.get('email', 'unknown')}")
+        
         # Accept either 'username' or 'name' field, generate username if needed
         if not data.get('email') or not data.get('password'):
             audit_log("register", data.get("email") or data.get("name"), "fail", "missing email or password")
@@ -193,6 +199,12 @@ def register():
 def login():
     try:
         data = request.get_json()
+        if not data:
+            audit_log("login", "unknown", "fail", "no JSON data received")
+            return jsonify({'error': 'Invalid request: No data received'}), 400
+        
+        logging.info(f"Login attempt for identifier: {data.get('username') or data.get('email', 'unknown')}")
+        
         # Accept either 'username' or 'email' field
         identifier = data.get('username') or data.get('email')
         if not identifier or not data.get('password'):

@@ -20,6 +20,8 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Log request for debugging
+  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data || '');
   return config;
 });
 
@@ -68,14 +70,19 @@ api.interceptors.response.use(
     } else if (error.request) {
       // Request made but no response
       console.error('No response from server:', error.request);
+      console.error('Request URL:', error.config?.url);
+      console.error('Request method:', error.config?.method);
+      console.error('Request baseURL:', error.config?.baseURL);
       error.response = {
         data: { error: 'Network error. Please check your connection and try again.' }
       };
     } else {
       // Error in request setup
       console.error('Request error:', error.message);
+      console.error('Error config:', error.config);
+      console.error('Full error:', error);
       error.response = {
-        data: { error: 'Request failed. Please try again.' }
+        data: { error: error.message || 'Request failed. Please try again.' }
       };
     }
     
