@@ -259,8 +259,22 @@ def log_request_info():
     logger.info(f"[{request.method}] {request.path} - Origin: {request.headers.get('Origin', 'N/A')} - IP: {request.remote_addr}")
     if request.method in ['POST', 'PUT', 'PATCH']:
         try:
+            # Sanitize request body to remove sensitive data before logging
             body = request.get_data(as_text=True)
-            logger.info(f"Request body: {body[:500]}")  # Log first 500 chars
+            if body:
+                import json
+                try:
+                    data = json.loads(body)
+                    # Remove sensitive fields
+                    sensitive_fields = ['password', 'old_password', 'new_password', 'confirmPassword', 'currentPassword']
+                    sanitized_data = {k: ('***REDACTED***' if k in sensitive_fields else v) for k, v in data.items()}
+                    logger.info(f"Request body: {json.dumps(sanitized_data)[:500]}")
+                except (json.JSONDecodeError, TypeError):
+                    # If not JSON, check if it contains password-like data
+                    if 'password' not in body.lower():
+                        logger.info(f"Request body: {body[:500]}")
+                    else:
+                        logger.info("Request body: [Contains sensitive data - not logged]")
         except Exception:
             pass
 

@@ -11,6 +11,6 @@
     }
   ],
   "env": {
-    "VITE_API_URL": "https://mindflow-backend.onrender.com/api"
+    "VITE_API_URL": "https://mindflow-backend-9ec8.onrender.com/api"
   }
 }

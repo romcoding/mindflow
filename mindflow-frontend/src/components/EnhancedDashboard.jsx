@@ -1023,8 +1023,8 @@ const EnhancedDashboard = () => {
               console.log('Update profile:', profileData);
             }}
             onChangePassword={(passwordData) => {
-              // Handle password change
-              console.log('Change password:', passwordData);
+              // Handle password change (password data is never logged for security)
+              changePassword(passwordData);
             }}
             onDeleteAccount={() => {
               // Handle account deletion

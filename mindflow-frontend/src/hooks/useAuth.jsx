@@ -143,6 +143,7 @@ export const AuthProvider = ({ children }) => {
         hasPassword: !!userData.password,
         first_name: userData.first_name,
         last_name: userData.last_name
+        // Password is intentionally NOT logged
       });
       const response = await authAPI.register(userData);
       console.log("Registration response:", response);

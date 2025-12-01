@@ -1,7 +1,32 @@
 import axios from 'axios';
 
+// Sanitize request data to remove sensitive information
+function sanitizeRequestData(data) {
+  if (!data || typeof data !== 'object') return data;
+  
+  const sensitiveFields = ['password', 'old_password', 'new_password', 'confirmPassword', 'currentPassword'];
+  const sanitized = { ...data };
+  
+  sensitiveFields.forEach(field => {
+    if (sanitized[field]) {
+      sanitized[field] = '***REDACTED***';
+    }
+  });
+  
+  return sanitized;
+}
+
 // Base URL for the backend API. Configure in Vercel as VITE_API_URL.
-const baseURL = import.meta.env?.VITE_API_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+let baseURL = import.meta.env?.VITE_API_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+
+// Validate that baseURL is a valid HTTP/HTTPS URL (not a database connection string)
+if (baseURL && (baseURL.startsWith('postgresql://') || baseURL.startsWith('postgres://') || baseURL.startsWith('mysql://'))) {
+  console.error('❌ ERROR: VITE_API_URL is set to a database connection string instead of the backend API URL!');
+  console.error('Current value:', baseURL);
+  console.error('Please set VITE_API_URL in Vercel to: https://mindflow-backend-9ec8.onrender.com/api');
+  // Fallback to default backend URL
+  baseURL = 'https://mindflow-backend-9ec8.onrender.com/api';
+}
 
 console.log('🔗 API Base URL:', baseURL);
 console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
@@ -20,8 +45,9 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
-  // Log request for debugging
-  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data || '');
+  // Log request for debugging (sanitize sensitive data)
+  const sanitizedData = config.data ? sanitizeRequestData(config.data) : '';
+  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, sanitizedData);
   return config;
 });
 
