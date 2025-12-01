@@ -18,9 +18,25 @@ export const AuthProvider = ({ children }) => {
       
       if (storedToken) {
         try {
-          const decoded = jwtDecode(storedToken);
+          // Decode token to check validity
+          let decoded;
+          try {
+            decoded = jwtDecode(storedToken);
+          } catch (decodeError) {
+            console.error('Failed to decode token:', decodeError);
+            // If token can't be decoded, it's invalid - clear it
+            localStorage.removeItem('token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+          
           // Check if token is expired
-          if (decoded.exp * 1000 > Date.now()) {
+          const expirationTime = decoded.exp ? decoded.exp * 1000 : null;
+          if (expirationTime && expirationTime > Date.now()) {
             // Use stored user object if available, otherwise fall back to JWT claims
             if (storedUser) {
               try {
@@ -103,6 +119,13 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Attempting login with:', { email: credentials.email, hasPassword: !!credentials.password });
       const response = await authAPI.login(credentials);
       
+      console.log('📥 Login response received:', { 
+        hasAccessToken: !!response.data.access_token,
+        hasRefreshToken: !!response.data.refresh_token,
+        hasUser: !!response.data.user,
+        userEmail: response.data.user?.email
+      });
+      
       // Backend returns access_token, refresh_token, user, and message
       if (response.data.access_token && response.data.user) {
         const { access_token: newToken, refresh_token: newRefreshToken, user: userData } = response.data;
@@ -114,14 +137,28 @@ export const AuthProvider = ({ children }) => {
         }
         localStorage.setItem('user', JSON.stringify(userData));
         
+        console.log('✅ Login successful, tokens stored');
+        console.log('🔍 Token preview:', newToken.substring(0, 20) + '...');
+        
+        // Set state immediately
         setToken(newToken);
         setUser(userData);
+        
+        // Verify token was stored
+        const verifyToken = localStorage.getItem('token');
+        if (!verifyToken) {
+          console.error('❌ Token was not stored in localStorage!');
+        } else {
+          console.log('✅ Token verified in localStorage');
+        }
+        
         return { success: true, user: userData };
       } else {
+        console.error('❌ Login response missing required data:', response.data);
         return { success: false, error: response.data.error || response.data.message || 'Login failed' };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       console.error('Login error response:', error.response);
       console.error('Login error request:', error.request);
       const errorMessage = error.response?.data?.error || 
@@ -233,8 +270,16 @@ export const AuthProvider = ({ children }) => {
   const refreshToken = async () => {
     try {
       const response = await authAPI.refreshToken();
-      if (response.data.success && response.data.access_token) {
-        const { access_token: newToken, user: userData } = response.data;
+      console.log('🔄 Refresh token response:', { 
+        hasSuccess: !!response.data.success,
+        hasAccessToken: !!response.data.access_token,
+        hasUser: !!response.data.user
+      });
+      
+      // Backend returns either {success: true, access_token: ...} or {access_token: ...}
+      const newToken = response.data.access_token;
+      if (newToken) {
+        const userData = response.data.user;
         
         // Update stored token and user object
         localStorage.setItem('token', newToken);
@@ -243,14 +288,20 @@ export const AuthProvider = ({ children }) => {
           setUser(userData);
         }
         setToken(newToken);
+        console.log('✅ Token refreshed successfully in useAuth');
         return { success: true };
       } else {
+        console.error('❌ Refresh response missing access_token');
         logout();
         return { success: false };
       }
     } catch (error) {
-      console.error('Token refresh error:', error);
-      logout();
+      console.error('❌ Token refresh error:', error);
+      console.error('Refresh error response:', error.response?.data);
+      // Only logout if it's actually an auth error, not a network error
+      if (error.response && error.response.status === 401) {
+        logout();
+      }
       return { success: false };
     }
   };

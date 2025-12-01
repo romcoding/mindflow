@@ -63,34 +63,46 @@ api.interceptors.response.use(
       console.error(`API Error [${status}]:`, data);
       
       // Handle 401 - Unauthorized (token expired/invalid)
+      // Don't handle 401 for auth endpoints (login, register, refresh) - those are expected
       if (status === 401 && !error.config.url.includes('/auth/')) {
         // Try to refresh token if we have a refresh token
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
         if (refreshToken && !error.config._retry) {
           error.config._retry = true;
           try {
+            console.log('🔄 Attempting token refresh due to 401 error');
             const refreshResponse = await api.post('/auth/refresh', {}, {
               headers: { Authorization: `Bearer ${refreshToken}` }
             });
-            if (refreshResponse.data.access_token) {
-              const newToken = refreshResponse.data.access_token;
-              localStorage.setItem('token', newToken);
-              if (refreshResponse.data.user) {
-                localStorage.setItem('user', JSON.stringify(refreshResponse.data.user));
+            if (refreshResponse.data.access_token || refreshResponse.data.success) {
+              const newToken = refreshResponse.data.access_token || refreshResponse.data.access_token;
+              if (newToken) {
+                localStorage.setItem('token', newToken);
+                if (refreshResponse.data.user) {
+                  localStorage.setItem('user', JSON.stringify(refreshResponse.data.user));
+                }
+                console.log('✅ Token refreshed successfully');
+                // Retry original request with new token
+                error.config.headers.Authorization = `Bearer ${newToken}`;
+                return api(error.config);
               }
-              // Retry original request with new token
-              error.config.headers.Authorization = `Bearer ${newToken}`;
-              return api(error.config);
             }
           } catch (refreshError) {
             // Refresh failed, clear tokens and redirect to login
+            console.error('❌ Token refresh failed:', refreshError);
             if (typeof window !== 'undefined') {
-              localStorage.removeItem('token');
-              localStorage.removeItem('refresh_token');
-              localStorage.removeItem('user');
-              window.location.reload();
+              // Only clear tokens if refresh actually failed, not on network errors
+              if (refreshError.response && refreshError.response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+                // Don't reload immediately - let the auth hook handle it
+                console.log('🔒 Tokens cleared due to refresh failure');
+              }
             }
           }
+        } else if (!refreshToken) {
+          console.warn('⚠️ No refresh token available for 401 error');
         }
       }
     } else if (error.request) {
