@@ -40,8 +40,16 @@ app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'sta
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-# JWT_SECRET_KEY - if not set, use SECRET_KEY as fallback for consistency
-jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'jwt-secret-change-in-production'
+# JWT_SECRET_KEY - CRITICAL: Must match between token creation and validation
+# If JWT_SECRET_KEY is not set, use SECRET_KEY to ensure consistency
+jwt_secret = os.environ.get('JWT_SECRET_KEY')
+if not jwt_secret:
+    # Fallback to SECRET_KEY to ensure tokens created with one secret can be validated with the same
+    jwt_secret = os.environ.get('SECRET_KEY', 'jwt-secret-change-in-production')
+    logger.warning("JWT_SECRET_KEY not set, using SECRET_KEY as fallback. This is OK if SECRET_KEY is stable.")
+else:
+    logger.info("JWT_SECRET_KEY is set from environment")
+
 app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
@@ -49,7 +57,7 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_ALGORITHM'] = 'HS256'  # Explicitly set algorithm
 
 # Log JWT configuration (without exposing the actual secret)
-logger.info(f"JWT configured: algorithm=HS256, secret_key_length={len(jwt_secret)}, expires={app.config['JWT_ACCESS_TOKEN_EXPIRES']}")
+logger.info(f"JWT configured: algorithm=HS256, secret_key_set={bool(jwt_secret)}, secret_key_length={len(jwt_secret)}, expires={app.config['JWT_ACCESS_TOKEN_EXPIRES']}")
 # Session configuration for OAuth state management
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'  # True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
