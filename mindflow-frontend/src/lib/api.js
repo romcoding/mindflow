@@ -44,6 +44,15 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
+    // Log token presence for debugging (not the actual token)
+    if (config.url && !config.url.includes('/auth/')) {
+      console.log(`🔑 Token attached to request: ${config.method?.toUpperCase()} ${config.url}`);
+    }
+  } else {
+    // Warn if token is missing for protected endpoints
+    if (config.url && !config.url.includes('/auth/')) {
+      console.warn(`⚠️ No token available for request: ${config.method?.toUpperCase()} ${config.url}`);
+    }
   }
   // Log request for debugging (sanitize sensitive data)
   const sanitizedData = config.data ? sanitizeRequestData(config.data) : '';

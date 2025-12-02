@@ -52,7 +52,7 @@ def validate_password(password):
         return False, "Password must contain at least one number"
     return True, "Password is valid"
 
-def ensure_db_connection(max_retries=3):
+def ensure_db_connection(max_retries=2):
     """Ensure database connection is available with retry logic.
     Render PostgreSQL databases on free tier sleep after inactivity."""
     for retry in range(max_retries):
@@ -63,8 +63,9 @@ def ensure_db_connection(max_retries=3):
         except (OperationalError, SQLAlchemyError) as db_error:
             if retry < max_retries - 1:
                 # Wait before retrying (database might be waking up)
+                # Reduced wait time for faster response
                 import time
-                time.sleep(0.5 * (retry + 1))  # 0.5s, 1s, 1.5s
+                time.sleep(0.3 * (retry + 1))  # 0.3s, 0.6s (faster than before)
                 # Try to refresh the connection
                 try:
                     db.session.rollback()
@@ -110,7 +111,8 @@ def register():
         
         # Check database connection before proceeding with retry logic
         # Render PostgreSQL databases on free tier sleep after inactivity and need a moment to wake up
-        if not ensure_db_connection():
+        # Reduce retries for faster response - database should be awake by now
+        if not ensure_db_connection(max_retries=2):
             audit_log("register", email, "fail", "database connection failed after retries")
             return jsonify({
                 'error': 'Database connection error',
@@ -237,7 +239,8 @@ def login():
             return jsonify({'error': 'Username/email and password are required'}), 400
         
         # Check database connection before proceeding
-        if not ensure_db_connection():
+        # Use fewer retries for login to speed it up
+        if not ensure_db_connection(max_retries=2):
             audit_log("login", identifier, "fail", "database connection failed")
             return jsonify({
                 'error': 'Database connection error',

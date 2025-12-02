@@ -277,6 +277,16 @@ const EnhancedDashboard = () => {
     }
     
     try {
+      // Verify we have a token before making the request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No token available for quick add');
+        alert('You are not authenticated. Please log in again.');
+        return;
+      }
+      
+      console.log('🔑 Token available for quick add:', token.substring(0, 20) + '...');
+      
       if (analysis.type === 'task') {
         const taskData = {
           title: quickAddText,
@@ -290,7 +300,7 @@ const EnhancedDashboard = () => {
         await tasksAPI.createTask(taskData);
         alert('Task created successfully!');
       } else if (analysis.type === 'stakeholder') {
-        const name = analysis.extractedNames[0] || 'New Contact';
+        const name = analysis.extractedNames?.[0] || 'New Contact';
         const stakeholderData = {
           name: name,
           personal_notes: quickAddText,
@@ -316,8 +326,24 @@ const EnhancedDashboard = () => {
       setAnalysisResult(null);
       await loadData(); // Ensure data is reloaded
     } catch (error) {
-      console.error('Failed to create item:', error);
-      alert(`Failed to create item: ${error.response?.data?.error || error.message}`);
+      console.error('❌ Failed to create item:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      let errorMessage = 'Failed to create item';
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+        // Clear tokens and reload to force re-login
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        window.location.reload();
+      } else {
+        errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create item';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -1028,8 +1054,8 @@ const EnhancedDashboard = () => {
 
       {/* User Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-          <div className="p-6">
+        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto p-0 m-4">
+          <div className="p-6 w-full">
             <UserProfile
             user={user}
             onUpdateProfile={(profileData) => {
