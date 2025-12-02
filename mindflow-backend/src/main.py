@@ -40,10 +40,16 @@ app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'sta
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
+# JWT_SECRET_KEY - if not set, use SECRET_KEY as fallback for consistency
+jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('SECRET_KEY') or 'jwt-secret-change-in-production'
+app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_ALGORITHM'] = 'HS256'  # Explicitly set algorithm
+
+# Log JWT configuration (without exposing the actual secret)
+logger.info(f"JWT configured: algorithm=HS256, secret_key_length={len(jwt_secret)}, expires={app.config['JWT_ACCESS_TOKEN_EXPIRES']}")
 # Session configuration for OAuth state management
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'  # True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -60,6 +66,9 @@ def expired_token_callback(jwt_header, jwt_payload):
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error):
+    logger.error(f"Invalid token error: {str(error)}")
+    logger.error(f"JWT_SECRET_KEY configured: {bool(app.config.get('JWT_SECRET_KEY'))}")
+    logger.error(f"JWT_SECRET_KEY length: {len(app.config.get('JWT_SECRET_KEY', ''))}")
     return jsonify({'error': 'Invalid token', 'message': 'Please log in again'}), 401
 
 @jwt.unauthorized_loader
@@ -310,7 +319,14 @@ def log_request_info():
     # Skip logging for health checks and static files
     if request.path in ['/health', '/favicon.ico', '/robots.txt']:
         return
-    logger.info(f"[{request.method}] {request.path} - Origin: {request.headers.get('Origin', 'N/A')} - IP: {request.remote_addr}")
+    
+    # Log Authorization header presence (not the actual token)
+    auth_header = request.headers.get('Authorization', '')
+    has_auth = bool(auth_header)
+    auth_preview = auth_header[:20] + '...' if auth_header and len(auth_header) > 20 else 'None'
+    
+    logger.info(f"[{request.method}] {request.path} - Origin: {request.headers.get('Origin', 'N/A')} - IP: {request.remote_addr} - Auth: {has_auth} ({auth_preview})")
+    
     if request.method in ['POST', 'PUT', 'PATCH']:
         try:
             # Sanitize request body to remove sensitive data before logging

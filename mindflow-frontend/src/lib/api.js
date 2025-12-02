@@ -43,10 +43,12 @@ api.interceptors.request.use((config) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (token) {
     config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+    // Ensure Authorization header is set correctly
+    config.headers.Authorization = `Bearer ${token.trim()}`;
     // Log token presence for debugging (not the actual token)
     if (config.url && !config.url.includes('/auth/')) {
       console.log(`🔑 Token attached to request: ${config.method?.toUpperCase()} ${config.url}`);
+      console.log(`🔑 Token length: ${token.length}, starts with: ${token.substring(0, 20)}...`);
     }
   } else {
     // Warn if token is missing for protected endpoints
