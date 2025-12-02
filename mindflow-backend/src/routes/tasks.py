@@ -11,6 +11,9 @@ tasks_bp = Blueprint('tasks', __name__)
 @jwt_required()
 def get_tasks():
     try:
+        # Log token validation success
+        import logging
+        logging.info(f"✅ Token validated successfully for user {get_jwt_identity()}")
         current_user_id = get_jwt_identity()
         
         # Get query parameters for filtering

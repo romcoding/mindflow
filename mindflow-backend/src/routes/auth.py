@@ -180,6 +180,9 @@ def register():
             'first_name': user.first_name,
             'last_name': user.last_name
         }
+        # Log JWT config before creating token
+        from flask import current_app
+        logging.info(f"Creating access token for user {user.id} with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
         access_token = create_access_token(
             identity=user.id, 
             additional_claims=additional_claims,
@@ -190,6 +193,7 @@ def register():
             additional_claims=additional_claims,
             expires_delta=timedelta(days=30)
         )
+        logging.info(f"Token created successfully, length: {len(access_token)}")
         audit_log("register", email, "success", None)
         return jsonify({
             'message': 'User registered successfully',
@@ -280,6 +284,9 @@ def login():
             'first_name': user.first_name,
             'last_name': user.last_name
         }
+        # Log JWT config before creating token
+        from flask import current_app
+        logging.info(f"Creating access token for user {user.id} with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
         access_token = create_access_token(
             identity=user.id,
             additional_claims=additional_claims,
@@ -290,6 +297,7 @@ def login():
             additional_claims=additional_claims,
             expires_delta=timedelta(days=30)
         )
+        logging.info(f"Token created successfully, length: {len(access_token)}")
         audit_log("login", identifier, "success", None)
         return jsonify({
             'message': 'Login successful',

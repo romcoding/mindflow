@@ -74,9 +74,11 @@ def expired_token_callback(jwt_header, jwt_payload):
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error):
-    logger.error(f"Invalid token error: {str(error)}")
+    logger.error(f"❌ Invalid token error: {str(error)}")
     logger.error(f"JWT_SECRET_KEY configured: {bool(app.config.get('JWT_SECRET_KEY'))}")
     logger.error(f"JWT_SECRET_KEY length: {len(app.config.get('JWT_SECRET_KEY', ''))}")
+    logger.error(f"JWT_ALGORITHM: {app.config.get('JWT_ALGORITHM', 'NOT SET')}")
+    logger.error(f"Authorization header: {request.headers.get('Authorization', 'NOT PRESENT')[:50] if request.headers.get('Authorization') else 'NOT PRESENT'}")
     return jsonify({'error': 'Invalid token', 'message': 'Please log in again'}), 401
 
 @jwt.unauthorized_loader
