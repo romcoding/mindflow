@@ -1054,7 +1054,7 @@ const EnhancedDashboard = () => {
 
       {/* User Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto p-0 m-4">
+        <DialogContent className="!max-w-[95vw] w-full max-h-[90vh] overflow-y-auto p-0 m-4">
           <div className="p-6 w-full">
             <UserProfile
             user={user}
