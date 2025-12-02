@@ -309,6 +309,23 @@ def health_check():
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
+# JWT configuration debug endpoint (for troubleshooting)
+@app.route('/api/debug/jwt-config', methods=['GET'])
+def debug_jwt_config():
+    """Debug endpoint to verify JWT configuration"""
+    config_info = {
+        'jwt_secret_key_set': bool(app.config.get('JWT_SECRET_KEY')),
+        'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
+        'jwt_algorithm': app.config.get('JWT_ALGORITHM', 'NOT SET'),
+        'jwt_access_token_expires': str(app.config.get('JWT_ACCESS_TOKEN_EXPIRES')),
+        'jwt_token_location': app.config.get('JWT_TOKEN_LOCATION', []),
+        'secret_key_set': bool(app.config.get('SECRET_KEY')),
+        'secret_key_length': len(app.config.get('SECRET_KEY', '')),
+        'env_jwt_secret_key_set': bool(os.environ.get('JWT_SECRET_KEY')),
+        'env_secret_key_set': bool(os.environ.get('SECRET_KEY')),
+    }
+    return jsonify(config_info), 200
+
 # Security headers middleware
 @app.after_request
 def set_security_headers(response):
