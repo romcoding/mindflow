@@ -128,6 +128,20 @@ def get_tasks():
             EnhancedTask.due_date.asc().nullslast()
         ).all()
         
+        # Ensure all tasks have board_column and board_position set
+        for task in tasks:
+            if not task.board_column:
+                task.board_column = 'todo'
+                # Set position to end of column
+                max_pos = db.session.query(db.func.max(EnhancedTask.board_position)).filter_by(
+                    user_id=current_user_id,
+                    board_column='todo'
+                ).scalar() or 0
+                task.board_position = max_pos + 1
+                db.session.commit()
+            if task.board_position is None:
+                task.board_position = 0
+        
         return jsonify({
             'success': True,
             'tasks': [task.to_dict() for task in tasks]
@@ -347,6 +361,12 @@ def move_task(task_id):
         
         if not new_column:
             return jsonify({'success': False, 'error': 'Missing board_column'}), 400
+        
+        # Ensure task has board_column set (for tasks created before board_column was added)
+        if not task.board_column:
+            task.board_column = 'todo'
+        if task.board_position is None:
+            task.board_position = 0
         
         old_column = task.board_column
         old_position = task.board_position
