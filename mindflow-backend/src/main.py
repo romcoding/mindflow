@@ -49,6 +49,8 @@ if not jwt_secret:
     logger.warning("JWT_SECRET_KEY not set, using SECRET_KEY as fallback. This is OK if SECRET_KEY is stable.")
 else:
     logger.info("JWT_SECRET_KEY is set from environment")
+    # Strip whitespace in case there's any
+    jwt_secret = jwt_secret.strip()
 
 app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
@@ -64,8 +66,12 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Allows OAuth redirects
 
 # Initialize extensions
+# IMPORTANT: JWTManager must be initialized AFTER setting JWT_SECRET_KEY
 jwt = JWTManager(app)
 bcrypt.init_app(app)
+
+# Verify JWT configuration after initialization
+logger.info(f"JWTManager initialized with secret key length: {len(app.config.get('JWT_SECRET_KEY', ''))}")
 
 # JWT error handlers
 @jwt.expired_token_loader
@@ -323,8 +329,47 @@ def debug_jwt_config():
         'secret_key_length': len(app.config.get('SECRET_KEY', '')),
         'env_jwt_secret_key_set': bool(os.environ.get('JWT_SECRET_KEY')),
         'env_secret_key_set': bool(os.environ.get('SECRET_KEY')),
+        'secret_keys_match': app.config.get('JWT_SECRET_KEY') == app.config.get('SECRET_KEY'),
+        'env_secret_keys_match': os.environ.get('JWT_SECRET_KEY') == os.environ.get('SECRET_KEY'),
     }
     return jsonify(config_info), 200
+
+# Test token validation endpoint
+@app.route('/api/debug/test-token', methods=['POST'])
+def test_token_validation():
+    """Test endpoint to manually validate a token"""
+    try:
+        from flask_jwt_extended import decode_token
+        from flask import request as req
+        
+        data = req.get_json()
+        token = data.get('token')
+        
+        if not token:
+            return jsonify({'error': 'No token provided'}), 400
+        
+        # Try to decode the token
+        try:
+            decoded = decode_token(token)
+            return jsonify({
+                'success': True,
+                'decoded': {
+                    'sub': decoded.get('sub'),
+                    'exp': decoded.get('exp'),
+                    'iat': decoded.get('iat'),
+                    'type': decoded.get('type'),
+                },
+                'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
+            }), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Security headers middleware
 @app.after_request
