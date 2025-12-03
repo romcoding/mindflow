@@ -128,19 +128,26 @@ def get_tasks():
             EnhancedTask.due_date.asc().nullslast()
         ).all()
         
-        # Ensure all tasks have board_column and board_position set
+        # Ensure all tasks have board_column and board_position set (for tasks created before these fields existed)
+        needs_commit = False
         for task in tasks:
-            if not task.board_column:
+            if not task.board_column or task.board_column is None:
                 task.board_column = 'todo'
+                needs_commit = True
+            if task.board_position is None:
                 # Set position to end of column
                 max_pos = db.session.query(db.func.max(EnhancedTask.board_position)).filter_by(
                     user_id=current_user_id,
-                    board_column='todo'
+                    board_column=task.board_column
                 ).scalar() or 0
                 task.board_position = max_pos + 1
+                needs_commit = True
+        
+        if needs_commit:
+            try:
                 db.session.commit()
-            if task.board_position is None:
-                task.board_position = 0
+            except Exception:
+                db.session.rollback()
         
         return jsonify({
             'success': True,
