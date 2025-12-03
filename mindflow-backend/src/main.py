@@ -292,6 +292,25 @@ try:
             logger.warning(f"Could not add OAuth columns automatically: {str(migration_error)[:200]}")
             logger.info("You may need to run add_oauth_columns.py manually")
         
+        # Try to add missing stakeholder columns if they don't exist
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if 'stakeholder' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('stakeholder')]
+                required_stakeholder_columns = ['family_info']
+                missing_columns = [col for col in required_stakeholder_columns if col not in columns]
+                
+                if missing_columns:
+                    logger.info(f"Adding missing stakeholder columns: {missing_columns}")
+                    with db.engine.connect() as conn:
+                        if 'family_info' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN family_info TEXT'))
+                        conn.commit()
+                    logger.info("Stakeholder columns added successfully")
+        except Exception as migration_error:
+            logger.warning(f"Could not add stakeholder columns automatically: {str(migration_error)[:200]}")
+        
         logger.info("Database initialized successfully on startup")
 except Exception as e:
     logger.warning("Database not immediately available, will retry in background: %s", str(e)[:200])
