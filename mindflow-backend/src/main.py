@@ -298,16 +298,99 @@ try:
             inspector = inspect(db.engine)
             if 'stakeholder' in inspector.get_table_names():
                 columns = [col['name'] for col in inspector.get_columns('stakeholder')]
-                required_stakeholder_columns = ['family_info']
+                # All columns from the Stakeholder model that might be missing
+                required_stakeholder_columns = [
+                    'family_info', 'hobbies', 'education', 'career_history',
+                    'job_title', 'seniority_level', 'years_experience', 'specializations',
+                    'decision_making_authority', 'budget_authority', 'location', 'timezone',
+                    'preferred_language', 'cultural_background', 'preferred_communication_method',
+                    'communication_frequency', 'best_contact_time', 'communication_style',
+                    'linkedin_url', 'twitter_handle', 'other_social_links', 'current_projects',
+                    'availability_status', 'trust_level', 'collaboration_history',
+                    'conflict_resolution_style', 'strategic_value', 'risk_level',
+                    'opportunity_potential', 'sentiment', 'influence', 'interest', 'tags',
+                    'created_at', 'updated_at', 'last_contact'
+                ]
                 missing_columns = [col for col in required_stakeholder_columns if col not in columns]
                 
                 if missing_columns:
                     logger.info(f"Adding missing stakeholder columns: {missing_columns}")
                     with db.engine.connect() as conn:
+                        # Add each missing column with appropriate type
                         if 'family_info' not in columns:
                             conn.execute(text('ALTER TABLE stakeholder ADD COLUMN family_info TEXT'))
+                        if 'hobbies' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN hobbies TEXT'))
+                        if 'education' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN education TEXT'))
+                        if 'career_history' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN career_history TEXT'))
+                        if 'job_title' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN job_title VARCHAR(100)'))
+                        if 'seniority_level' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN seniority_level VARCHAR(50)'))
+                        if 'years_experience' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN years_experience INTEGER'))
+                        if 'specializations' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN specializations TEXT'))
+                        if 'decision_making_authority' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN decision_making_authority VARCHAR(50) DEFAULT 'low'"))
+                        if 'budget_authority' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN budget_authority VARCHAR(50) DEFAULT 'none'"))
+                        if 'location' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN location VARCHAR(100)'))
+                        if 'timezone' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN timezone VARCHAR(50)'))
+                        if 'preferred_language' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN preferred_language VARCHAR(50) DEFAULT 'English'"))
+                        if 'cultural_background' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN cultural_background VARCHAR(100)'))
+                        if 'preferred_communication_method' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN preferred_communication_method VARCHAR(50) DEFAULT 'email'"))
+                        if 'communication_frequency' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN communication_frequency VARCHAR(50) DEFAULT 'weekly'"))
+                        if 'best_contact_time' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN best_contact_time VARCHAR(100)'))
+                        if 'communication_style' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN communication_style VARCHAR(50)'))
+                        if 'linkedin_url' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN linkedin_url VARCHAR(200)'))
+                        if 'twitter_handle' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN twitter_handle VARCHAR(50)'))
+                        if 'other_social_links' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN other_social_links TEXT'))
+                        if 'current_projects' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN current_projects TEXT'))
+                        if 'availability_status' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN availability_status VARCHAR(50) DEFAULT 'available'"))
+                        if 'trust_level' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN trust_level INTEGER DEFAULT 5'))
+                        if 'collaboration_history' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN collaboration_history TEXT'))
+                        if 'conflict_resolution_style' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN conflict_resolution_style VARCHAR(50)'))
+                        if 'strategic_value' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN strategic_value VARCHAR(50) DEFAULT 'medium'"))
+                        if 'risk_level' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN risk_level VARCHAR(50) DEFAULT 'low'"))
+                        if 'opportunity_potential' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN opportunity_potential VARCHAR(50) DEFAULT 'medium'"))
+                        if 'sentiment' not in columns:
+                            conn.execute(text("ALTER TABLE stakeholder ADD COLUMN sentiment VARCHAR(20) DEFAULT 'neutral'"))
+                        if 'influence' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN influence INTEGER DEFAULT 5'))
+                        if 'interest' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN interest INTEGER DEFAULT 5'))
+                        if 'tags' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN tags TEXT'))
+                        if 'created_at' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+                        if 'updated_at' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+                        if 'last_contact' not in columns:
+                            conn.execute(text('ALTER TABLE stakeholder ADD COLUMN last_contact TIMESTAMP'))
                         conn.commit()
-                    logger.info("Stakeholder columns added successfully")
+                    logger.info(f"Stakeholder columns added successfully: {len(missing_columns)} columns")
         except Exception as migration_error:
             logger.warning(f"Could not add stakeholder columns automatically: {str(migration_error)[:200]}")
         
