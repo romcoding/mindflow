@@ -387,7 +387,7 @@ def move_task(task_id):
                 EnhancedTask.board_position > old_position
             ).update({
                 EnhancedTask.board_position: EnhancedTask.board_position - 1
-            })
+            }, synchronize_session=False)
             
             # Get max position in new column
             max_position = db.session.query(db.func.max(EnhancedTask.board_position)).filter_by(
@@ -423,7 +423,7 @@ def move_task(task_id):
                     EnhancedTask.board_position <= new_position
                 ).update({
                     EnhancedTask.board_position: EnhancedTask.board_position - 1
-                })
+                }, synchronize_session=False)
             else:
                 # Moving up: shift tasks down
                 EnhancedTask.query.filter(
@@ -433,7 +433,7 @@ def move_task(task_id):
                     EnhancedTask.board_position < old_position
                 ).update({
                     EnhancedTask.board_position: EnhancedTask.board_position + 1
-                })
+                }, synchronize_session=False)
             
             task.board_position = new_position
         
