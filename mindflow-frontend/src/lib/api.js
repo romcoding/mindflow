@@ -162,6 +162,7 @@ export const tasksAPI = {
   getTasks: (params) => api.get('/tasks', { params }),
   createTask: (task) => api.post('/tasks', task),
   updateTask: (taskId, task) => api.put(`/tasks/${taskId}`, task),
+  moveTask: (taskId, boardColumn, boardPosition) => api.post(`/tasks/${taskId}/move`, { board_column: boardColumn, board_position: boardPosition }),
   deleteTask: (taskId) => api.delete(`/tasks/${taskId}`),
   toggleTask: (taskId) => api.patch(`/tasks/${taskId}/toggle`),
 };

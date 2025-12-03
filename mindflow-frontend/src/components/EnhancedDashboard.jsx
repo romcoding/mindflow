@@ -49,6 +49,146 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// Task Edit Form Component
+const TaskEditForm = ({ task, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    title: task.title || '',
+    description: task.description || '',
+    status: task.status || 'todo',
+    priority: task.priority || 'medium',
+    due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
+    board_column: task.board_column || 'todo',
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="title">Title</Label>
+        <Input
+          id="title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          rows={4}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="status">Status</Label>
+          <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todo">To Do</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="waiting">Waiting</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="priority">Priority</Label>
+          <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="due_date">Due Date</Label>
+        <Input
+          id="due_date"
+          type="date"
+          value={formData.due_date}
+          onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          Save Changes
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+// Note Edit Form Component
+const NoteEditForm = ({ note, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    content: note.content || '',
+    category: note.category || 'general',
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="content">Content</Label>
+        <Textarea
+          id="content"
+          value={formData.content}
+          onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+          rows={8}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="category">Category</Label>
+        <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="general">General</SelectItem>
+            <SelectItem value="idea">Idea</SelectItem>
+            <SelectItem value="meeting">Meeting</SelectItem>
+            <SelectItem value="reminder">Reminder</SelectItem>
+            <SelectItem value="reference">Reference</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          Save Changes
+        </Button>
+      </div>
+    </form>
+  );
+};
 
 const EnhancedDashboard = () => {
   const { user, logout, login, register, loading: authLoading, isAuthenticated } = useAuth();
@@ -64,7 +204,11 @@ const EnhancedDashboard = () => {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isStakeholderModalOpen, setIsStakeholderModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isTaskEditOpen, setIsTaskEditOpen] = useState(false);
+  const [isNoteEditOpen, setIsNoteEditOpen] = useState(false);
   const [selectedStakeholder, setSelectedStakeholder] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedNote, setSelectedNote] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Quick Add state
@@ -383,19 +527,52 @@ const EnhancedDashboard = () => {
   // Task management functions
   const handleTaskMove = async (taskId, newColumn, newPosition) => {
     try {
-      await tasksAPI.updateTask(taskId, {
-        board_column: newColumn,
-        board_position: newPosition
-      });
+      await tasksAPI.moveTask(taskId, newColumn, newPosition);
       loadData();
     } catch (error) {
       console.error('Failed to move task:', error);
+      alert('Failed to move task. Please try again.');
     }
   };
 
   const handleTaskClick = (task) => {
-    // Open task detail modal (to be implemented)
-    console.log('Task clicked:', task);
+    setSelectedTask(task);
+    setIsTaskEditOpen(true);
+  };
+
+  const handleTaskSave = async (taskData) => {
+    try {
+      if (selectedTask && selectedTask.id) {
+        await tasksAPI.updateTask(selectedTask.id, taskData);
+        alert('Task updated successfully!');
+      }
+      setIsTaskEditOpen(false);
+      setSelectedTask(null);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to save task:', error);
+      alert('Failed to save task. Please try again.');
+    }
+  };
+
+  const handleNoteClick = (note) => {
+    setSelectedNote(note);
+    setIsNoteEditOpen(true);
+  };
+
+  const handleNoteSave = async (noteData) => {
+    try {
+      if (selectedNote && selectedNote.id) {
+        await notesAPI.updateNote(selectedNote.id, noteData);
+        alert('Note updated successfully!');
+      }
+      setIsNoteEditOpen(false);
+      setSelectedNote(null);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to save note:', error);
+      alert('Failed to save note. Please try again.');
+    }
   };
 
   // Stakeholder management functions
@@ -740,11 +917,28 @@ const EnhancedDashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {notes.map(note => (
-          <Card key={note.id} className="hover:shadow-md transition-shadow cursor-pointer">
+          <Card 
+            key={note.id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handleNoteClick(note)}
+          >
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 mb-2">
-                {new Date(note.created_at).toLocaleDateString()}
-              </p>
+              <div className="flex items-start justify-between mb-2">
+                <p className="text-sm text-gray-600">
+                  {new Date(note.created_at).toLocaleDateString()}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNoteClick(note);
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
               <p className="text-gray-900">{note.content}</p>
               {note.category && (
                 <Badge variant="outline" className="mt-2">
@@ -1051,6 +1245,46 @@ const EnhancedDashboard = () => {
         onSave={handleStakeholderSave}
         isEditing={true}
       />
+
+      {/* Task Edit Modal */}
+      <Dialog open={isTaskEditOpen} onOpenChange={setIsTaskEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>Update task details</DialogDescription>
+          </DialogHeader>
+          {selectedTask && (
+            <TaskEditForm
+              task={selectedTask}
+              onSave={handleTaskSave}
+              onCancel={() => {
+                setIsTaskEditOpen(false);
+                setSelectedTask(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Note Edit Modal */}
+      <Dialog open={isNoteEditOpen} onOpenChange={setIsNoteEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Note</DialogTitle>
+            <DialogDescription>Update note content</DialogDescription>
+          </DialogHeader>
+          {selectedNote && (
+            <NoteEditForm
+              note={selectedNote}
+              onSave={handleNoteSave}
+              onCancel={() => {
+                setIsNoteEditOpen(false);
+                setSelectedNote(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* User Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>

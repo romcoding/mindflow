@@ -117,23 +117,72 @@ const StakeholderNetworkMap = ({
     const linkGroup = container.append('g').attr('class', 'links');
     const nodeGroup = container.append('g').attr('class', 'nodes');
 
-    // Create force simulation
+    // Group nodes by company for clustering
+    const companyGroups = {};
+    nodes.forEach(node => {
+      const company = node.company || 'Unknown';
+      if (!companyGroups[company]) {
+        companyGroups[company] = [];
+      }
+      companyGroups[company].push(node);
+    });
+
+    // Create force simulation with company clustering
     const newSimulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id(d => d.id).distance(100).strength(0.5))
+      .force('link', d3.forceLink(links).id(d => d.id)
+        .distance(d => {
+          // Shorter distance for same company, longer for different companies
+          const sourceNode = nodes.find(n => n.id === (typeof d.source === 'object' ? d.source.id : d.source));
+          const targetNode = nodes.find(n => n.id === (typeof d.target === 'object' ? d.target.id : d.target));
+          const sourceCompany = sourceNode?.company || 'Unknown';
+          const targetCompany = targetNode?.company || 'Unknown';
+          return sourceCompany === targetCompany ? 80 : 150;
+        })
+        .strength(d => {
+          // Stronger links for higher relationship strength
+          return (d.strength || 5) / 10;
+        }))
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
-      .force('collision', d3.forceCollide().radius(d => d.radius + 5));
+      .force('collision', d3.forceCollide().radius(d => d.radius + 5))
+      .force('x', d3.forceX().strength(0.1).x(d => {
+        // Cluster by company on X axis
+        const company = d.company || 'Unknown';
+        const companyIndex = Object.keys(companyGroups).indexOf(company);
+        const totalCompanies = Object.keys(companyGroups).length;
+        return (companyIndex + 1) * (dimensions.width / (totalCompanies + 1));
+      }))
+      .force('y', d3.forceY().strength(0.1).y(dimensions.height / 2));
 
-    // Create links
+    // Create links with enhanced visualization
     const link = linkGroup
       .selectAll('line')
       .data(links)
       .enter()
       .append('line')
       .attr('stroke', d => d.color)
-      .attr('stroke-width', d => d.strokeWidth)
-      .attr('stroke-opacity', 0.6)
-      .attr('marker-end', d => d.direction === 'source_to_target' ? 'url(#arrowhead)' : null);
+      .attr('stroke-width', d => {
+        // Thicker lines for stronger relationships
+        return Math.max(1, Math.min(5, (d.strength || 5) / 2));
+      })
+      .attr('stroke-opacity', d => {
+        // More opaque for stronger relationships
+        return 0.3 + ((d.strength || 5) / 10) * 0.5;
+      })
+      .attr('marker-end', d => d.direction === 'source_to_target' ? 'url(#arrowhead)' : null)
+      .attr('class', 'relationship-link')
+      .on('mouseover', function(event, d) {
+        // Highlight link on hover
+        d3.select(this)
+          .attr('stroke-width', Math.max(2, Math.min(6, (d.strength || 5) / 1.5)))
+          .attr('stroke-opacity', 0.9);
+      })
+      .on('mouseout', function(event, d) {
+        // Restore link on mouseout
+        d3.select(this)
+          .attr('stroke-width', Math.max(1, Math.min(5, (d.strength || 5) / 2)))
+          .attr('stroke-opacity', 0.3 + ((d.strength || 5) / 10) * 0.5);
+      });
 
     // Create arrowhead marker
     svg.append('defs').append('marker')
