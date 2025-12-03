@@ -13,8 +13,10 @@ def get_tasks():
     try:
         # Log token validation success
         import logging
-        logging.info(f"✅ Token validated successfully for user {get_jwt_identity()}")
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id_str = get_jwt_identity()
+        current_user_id = int(current_user_id_str) if current_user_id_str else None
+        logging.info(f"✅ Token validated successfully for user {current_user_id}")
         
         # Get query parameters for filtering
         completed = request.args.get('completed')
