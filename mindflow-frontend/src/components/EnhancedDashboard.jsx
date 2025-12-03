@@ -356,7 +356,7 @@ const EnhancedDashboard = () => {
     
     // Stakeholder indicators
     const stakeholderPatterns = [
-      /\b(person|contact|colleague|client|manager|team|boss|employee|partner)\b/i,
+      /\b(person|contact|colleague|client|manager|team|boss|employee|partner|stakeholder)\b/i,
       /\b(meet with|talk to|call|email|discuss with)\s+([A-Z][a-z]+)/i,
       /\b([A-Z][a-z]+)\s+(said|mentioned|thinks|wants|needs)\b/i
     ];
@@ -385,34 +385,157 @@ const EnhancedDashboard = () => {
       priority = 'medium';
     }
     
-    // Due date detection with more patterns
-    const dueDatePatterns = {
-      'today': /\b(today|now|immediately)\b/i,
-      'tomorrow': /\b(tomorrow|next day)\b/i,
-      'this week': /\b(this week|by friday|end of week)\b/i,
-      'next week': /\b(next week|following week)\b/i,
-      'this month': /\b(this month|end of month)\b/i
-    };
-    
+    // Enhanced due date detection with actual date parsing
     let dueDate = null;
-    for (const [date, pattern] of Object.entries(dueDatePatterns)) {
-      if (pattern.test(text)) {
-        dueDate = date;
+    const datePatterns = [
+      { pattern: /\b(today|now|immediately)\b/i, value: () => new Date().toISOString().split('T')[0] },
+      { pattern: /\b(tomorrow|next day)\b/i, value: () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0];
+      }},
+      { pattern: /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/, value: (match) => {
+        const [, month, day, year] = match;
+        const fullYear = year.length === 2 ? `20${year}` : year;
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }},
+      { pattern: /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{2,4})\b/i, value: (match) => {
+        const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+        const [, day, monthName, year] = match;
+        const month = (months.indexOf(monthName.toLowerCase()) + 1).toString().padStart(2, '0');
+        const fullYear = year.length === 2 ? `20${year}` : year;
+        return `${fullYear}-${month}-${day.padStart(2, '0')}`;
+      }},
+      { pattern: /\b(this week|by friday|end of week)\b/i, value: () => {
+        const friday = new Date();
+        const dayOfWeek = friday.getDay();
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+        friday.setDate(friday.getDate() + daysUntilFriday);
+        return friday.toISOString().split('T')[0];
+      }},
+      { pattern: /\b(next week|following week)\b/i, value: () => {
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        return nextWeek.toISOString().split('T')[0];
+      }},
+      { pattern: /\b(this month|end of month)\b/i, value: () => {
+        const endOfMonth = new Date();
+        endOfMonth.setMonth(endOfMonth.getMonth() + 1, 0);
+        return endOfMonth.toISOString().split('T')[0];
+      }}
+    ];
+    
+    for (const { pattern, value } of datePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        dueDate = typeof value === 'function' ? value(match) : value;
         break;
       }
     }
 
-    // Extract names for stakeholders
+    // Extract names for stakeholders (improved pattern)
     const nameMatches = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g);
     const extractedNames = nameMatches ? nameMatches.filter(name => 
-      !['I', 'The', 'This', 'That', 'Today', 'Tomorrow'].includes(name)
+      !['I', 'The', 'This', 'That', 'Today', 'Tomorrow', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(name)
     ) : [];
+
+    // Enhanced stakeholder information extraction
+    const stakeholderInfo = {
+      name: extractedNames[0] || null,
+      role: null,
+      company: null,
+      email: null,
+      phone: null,
+      birthday: null,
+      department: null,
+      job_title: null
+    };
+
+    if (isStakeholder || extractedNames.length > 0) {
+      // Extract role (e.g., "CEO", "Manager", "Head of Product")
+      const rolePatterns = [
+        /\b(ceo|cto|cfo|coo|president|director|manager|head|lead|senior|junior|executive|vp|vice president)\b/i,
+        /\b(head|lead|chief)\s+of\s+([a-z]+)/i,
+        /\b([a-z]+)\s+(manager|director|lead|head)\b/i
+      ];
+      for (const pattern of rolePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          stakeholderInfo.role = match[0];
+          break;
+        }
+      }
+
+      // Extract company name (capitalized words that might be company names)
+      const companyPatterns = [
+        /\b(works?|at|from|company|corp|inc|llc|ltd)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+        /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(inc|llc|ltd|corp|company)/i
+      ];
+      for (const pattern of companyPatterns) {
+        const match = text.match(pattern);
+        if (match && match[2]) {
+          stakeholderInfo.company = match[2];
+          break;
+        }
+      }
+
+      // Extract email
+      const emailMatch = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
+      if (emailMatch) {
+        stakeholderInfo.email = emailMatch[0];
+      }
+
+      // Extract phone number
+      const phoneMatch = text.match(/\b(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+      if (phoneMatch) {
+        stakeholderInfo.phone = phoneMatch[0].replace(/\s+/g, '');
+      }
+
+      // Extract birthday
+      const birthdayPatterns = [
+        /\b(born|birthday|birth date|dob)\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/i,
+        /\b(born|birthday|birth date|dob)\s+(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{2,4})\b/i
+      ];
+      for (const pattern of birthdayPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          if (match[3] && match[3].match(/^\d+$/)) {
+            // Format: MM/DD/YYYY
+            const month = match[2].padStart(2, '0');
+            const day = match[3].padStart(2, '0');
+            const year = match[4].length === 2 ? `20${match[4]}` : match[4];
+            stakeholderInfo.birthday = `${year}-${month}-${day}`;
+          } else {
+            // Format: DD Month YYYY
+            const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+            const month = (months.indexOf(match[3].toLowerCase()) + 1).toString().padStart(2, '0');
+            const day = match[2].padStart(2, '0');
+            const year = match[4].length === 2 ? `20${match[4]}` : match[4];
+            stakeholderInfo.birthday = `${year}-${month}-${day}`;
+          }
+          break;
+        }
+      }
+
+      // Extract department
+      const departmentMatch = text.match(/\b(department|dept|division)\s+of\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
+      if (departmentMatch) {
+        stakeholderInfo.department = departmentMatch[2];
+      }
+
+      // Extract job title (more specific than role)
+      const jobTitleMatch = text.match(/\b(job title|position|title)\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
+      if (jobTitleMatch) {
+        stakeholderInfo.job_title = jobTitleMatch[2];
+      }
+    }
 
     return {
       type: isTask ? 'task' : isStakeholder ? 'stakeholder' : 'note',
       priority,
       dueDate,
       extractedNames,
+      stakeholderInfo: isStakeholder || extractedNames.length > 0 ? stakeholderInfo : null,
       confidence: isTask ? 0.9 : isStakeholder ? 0.8 : 0.7,
       suggestions: {
         task: isTask ? text : `Create task: ${text.substring(0, 50)}...`,
@@ -464,15 +587,23 @@ const EnhancedDashboard = () => {
         await tasksAPI.createTask(taskData);
         alert('Task created successfully!');
       } else if (analysis.type === 'stakeholder') {
-        const name = analysis.extractedNames?.[0] || 'New Contact';
+        const stakeholderInfo = analysis.stakeholderInfo || {};
+        const name = stakeholderInfo.name || analysis.extractedNames?.[0] || 'New Contact';
         const stakeholderData = {
           name: name,
+          role: stakeholderInfo.role || null,
+          company: stakeholderInfo.company || null,
+          email: stakeholderInfo.email || null,
+          phone: stakeholderInfo.phone || null,
+          birthday: stakeholderInfo.birthday || null,
+          department: stakeholderInfo.department || null,
+          job_title: stakeholderInfo.job_title || null,
           personal_notes: quickAddText,
           sentiment: 'neutral',
           influence: 5,
           interest: 5
         };
-        console.log('Creating stakeholder:', stakeholderData);
+        console.log('Creating stakeholder with extracted info:', stakeholderData);
         await stakeholdersAPI.createStakeholder(stakeholderData);
         alert('Contact created successfully!');
       } else {
@@ -511,47 +642,104 @@ const EnhancedDashboard = () => {
     }
   };
 
-  // Handle voice input
+  // Handle voice input with improved UX
   const startVoiceRecording = () => {
-    if ('webkitSpeechRecognition' in window) {
-      const recognition = new window.webkitSpeechRecognition();
+    if (isRecording) {
+      // Stop recording if already recording
+      if (window.currentRecognition) {
+        window.currentRecognition.stop();
+      }
+      return;
+    }
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true; // Show interim results for better UX
       recognition.lang = 'en-US';
+
+      // Store recognition instance globally so we can stop it
+      window.currentRecognition = recognition;
 
       recognition.onstart = () => {
         setIsRecording(true);
+        console.log('🎤 Voice recording started');
       };
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setQuickAddText(transcript);
-        setAnalysisResult(analyzeContent(transcript));
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Update text with both interim and final results
+        const fullText = finalTranscript + interimTranscript;
+        setQuickAddText(fullText);
+        
+        // Only analyze when we have final results
+        if (finalTranscript.trim()) {
+          setAnalysisResult(analyzeContent(finalTranscript.trim()));
+        }
       };
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
+        
+        let errorMessage = 'Speech recognition error. ';
+        switch(event.error) {
+          case 'no-speech':
+            errorMessage = 'No speech detected. Please try again.';
+            break;
+          case 'audio-capture':
+            errorMessage = 'No microphone found. Please check your microphone.';
+            break;
+          case 'not-allowed':
+            errorMessage = 'Microphone permission denied. Please allow microphone access.';
+            break;
+          default:
+            errorMessage = `Error: ${event.error}`;
+        }
+        alert(errorMessage);
       };
 
       recognition.onend = () => {
         setIsRecording(false);
+        window.currentRecognition = null;
+        console.log('🎤 Voice recording ended');
       };
 
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+        setIsRecording(false);
+        alert('Failed to start voice recording. Please try again.');
+      }
     } else {
-      alert('Speech recognition not supported in this browser');
+      alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
     }
   };
 
   // Task management functions
   const handleTaskMove = async (taskId, newColumn, newPosition) => {
     try {
-      await tasksAPI.moveTask(taskId, newColumn, newPosition);
-      loadData();
+      console.log(`Moving task ${taskId} to column ${newColumn} at position ${newPosition}`);
+      const response = await tasksAPI.moveTask(taskId, newColumn, newPosition);
+      console.log('Move task response:', response.data);
+      await loadData();
     } catch (error) {
       console.error('Failed to move task:', error);
-      alert('Failed to move task. Please try again.');
+      console.error('Error details:', error.response?.data || error.message);
+      alert(`Failed to move task: ${error.response?.data?.error || error.message || 'Unknown error'}`);
     }
   };
 
@@ -563,15 +751,33 @@ const EnhancedDashboard = () => {
   const handleTaskSave = async (taskData) => {
     try {
       if (selectedTask && selectedTask.id) {
-        // If board_column changed, use moveTask endpoint
+        console.log('Saving task:', taskData);
+        console.log('Current task board_column:', selectedTask.board_column);
+        console.log('New task board_column:', taskData.board_column);
+        
+        // Always update board_column if status changed
+        if (taskData.status && taskData.board_column) {
+          // Ensure board_column matches status
+          const statusToColumn = {
+            'todo': 'todo',
+            'in_progress': 'in_progress',
+            'waiting': 'review',
+            'done': 'done'
+          };
+          taskData.board_column = statusToColumn[taskData.status] || taskData.board_column;
+        }
+        
+        // If board_column changed, use moveTask endpoint first
         if (taskData.board_column && taskData.board_column !== selectedTask.board_column) {
+          console.log(`Moving task from ${selectedTask.board_column} to ${taskData.board_column}`);
           await tasksAPI.moveTask(selectedTask.id, taskData.board_column, null);
-          // Update other fields separately
+          // Update other fields separately (excluding board_column as it's already updated)
           const { board_column, ...otherFields } = taskData;
           if (Object.keys(otherFields).length > 0) {
             await tasksAPI.updateTask(selectedTask.id, otherFields);
           }
         } else {
+          // Just update the task normally
           await tasksAPI.updateTask(selectedTask.id, taskData);
         }
         alert('Task updated successfully!');
@@ -581,7 +787,8 @@ const EnhancedDashboard = () => {
       await loadData();
     } catch (error) {
       console.error('Failed to save task:', error);
-      alert('Failed to save task. Please try again.');
+      console.error('Error details:', error.response?.data || error.message);
+      alert(`Failed to save task: ${error.response?.data?.error || error.message || 'Unknown error'}`);
     }
   };
 
@@ -1205,30 +1412,63 @@ const EnhancedDashboard = () => {
               <Button
                 variant={isRecording ? "destructive" : "outline"}
                 onClick={startVoiceRecording}
-                className="self-start"
+                className={`self-start ${isRecording ? 'animate-pulse' : ''}`}
+                title={isRecording ? 'Click to stop recording' : 'Click to start voice input'}
               >
-                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {isRecording ? (
+                  <>
+                    <MicOff className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Stop</span>
+                  </>
+                ) : (
+                  <>
+                    <Mic className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Speak</span>
+                  </>
+                )}
               </Button>
             </div>
 
             {analysisResult && (
               <Card className="bg-blue-50 border-blue-200">
                 <CardContent className="p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">AI Analysis</h4>
+                  <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+                    <Brain className="h-4 w-4" />
+                    AI Analysis
+                  </h4>
                   <div className="space-y-2">
                     <p className="text-sm text-blue-800">
-                      Detected as: <Badge variant="outline">{analysisResult.type}</Badge>
+                      Detected as: <Badge variant="outline" className="ml-1">{analysisResult.type}</Badge>
                       {analysisResult.priority && (
                         <>
-                          {' '}• Priority: <Badge variant="outline">{analysisResult.priority}</Badge>
+                          {' '}• Priority: <Badge variant="outline" className="ml-1">{analysisResult.priority}</Badge>
                         </>
                       )}
                       {analysisResult.dueDate && (
                         <>
-                          {' '}• Due: <Badge variant="outline">{analysisResult.dueDate}</Badge>
+                          {' '}• Due: <Badge variant="outline" className="ml-1">{analysisResult.dueDate}</Badge>
                         </>
                       )}
                     </p>
+                    {analysisResult.type === 'stakeholder' && analysisResult.stakeholderInfo && (
+                      <div className="mt-2 pt-2 border-t border-blue-200 space-y-1 text-xs">
+                        {analysisResult.stakeholderInfo.role && (
+                          <p>Role: <span className="font-medium">{analysisResult.stakeholderInfo.role}</span></p>
+                        )}
+                        {analysisResult.stakeholderInfo.company && (
+                          <p>Company: <span className="font-medium">{analysisResult.stakeholderInfo.company}</span></p>
+                        )}
+                        {analysisResult.stakeholderInfo.email && (
+                          <p>Email: <span className="font-medium">{analysisResult.stakeholderInfo.email}</span></p>
+                        )}
+                        {analysisResult.stakeholderInfo.phone && (
+                          <p>Phone: <span className="font-medium">{analysisResult.stakeholderInfo.phone}</span></p>
+                        )}
+                        {analysisResult.stakeholderInfo.birthday && (
+                          <p>Birthday: <span className="font-medium">{analysisResult.stakeholderInfo.birthday}</span></p>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-blue-600">
                       Confidence: {Math.round(analysisResult.confidence * 100)}%
                     </p>
