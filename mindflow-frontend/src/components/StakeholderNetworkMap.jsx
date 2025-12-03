@@ -323,10 +323,22 @@ const StakeholderNetworkMap = ({
     // Update positions on tick
     newSimulation.on('tick', () => {
       link
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
+        .attr('x1', d => {
+          const source = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === (typeof d.source === 'object' ? d.source.id : d.source));
+          return source?.x || 0;
+        })
+        .attr('y1', d => {
+          const source = typeof d.source === 'object' ? d.source : nodes.find(n => n.id === (typeof d.source === 'object' ? d.source.id : d.source));
+          return source?.y || 0;
+        })
+        .attr('x2', d => {
+          const target = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === (typeof d.target === 'object' ? d.target.id : d.target));
+          return target?.x || 0;
+        })
+        .attr('y2', d => {
+          const target = typeof d.target === 'object' ? d.target : nodes.find(n => n.id === (typeof d.target === 'object' ? d.target.id : d.target));
+          return target?.y || 0;
+        });
 
       node
         .attr('cx', d => d.x)
@@ -344,7 +356,7 @@ const StakeholderNetworkMap = ({
         newSimulation.stop();
       }
     };
-  }, [stakeholders, relationships, dimensions, selectedNodeId]);
+  }, [stakeholders, relationships, dimensions, selectedNodeId, selectedFilters]);
 
   // Tooltip functions
   const showTooltip = (event, d) => {
