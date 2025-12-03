@@ -15,7 +15,8 @@ enhanced_tasks_bp = Blueprint('enhanced_tasks', __name__)
 def get_categories():
     """Get all task categories for the current user"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         categories = TaskCategory.query.filter_by(
             user_id=current_user_id,
             is_active=True
@@ -34,7 +35,8 @@ def get_categories():
 def create_category():
     """Create a new task category"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -72,7 +74,8 @@ def create_category():
 def get_tasks():
     """Get tasks with advanced filtering and sorting"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Get query parameters
         status = request.args.get('status')
@@ -138,7 +141,8 @@ def get_tasks():
 def create_task():
     """Create a new enhanced task"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -236,7 +240,8 @@ def create_task():
 def update_task(task_id):
     """Update an enhanced task"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = EnhancedTask.query.filter_by(
             id=task_id,
             user_id=current_user_id
@@ -326,7 +331,8 @@ def update_task(task_id):
 def move_task(task_id):
     """Move task to different column or position (for Kanban board)"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = EnhancedTask.query.filter_by(
             id=task_id,
             user_id=current_user_id
@@ -421,7 +427,8 @@ def move_task(task_id):
 def get_kanban_board():
     """Get tasks organized by Kanban columns"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Define columns
         columns = ['todo', 'in_progress', 'review', 'done']
@@ -449,7 +456,8 @@ def get_kanban_board():
 def get_task_analytics():
     """Get task analytics and metrics"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Basic counts
         total_tasks = EnhancedTask.query.filter_by(user_id=current_user_id).count()
@@ -527,7 +535,8 @@ def get_task_analytics():
 def delete_task(task_id):
     """Delete a task"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = EnhancedTask.query.filter_by(
             id=task_id,
             user_id=current_user_id

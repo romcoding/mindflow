@@ -316,7 +316,8 @@ def login():
 def refresh():
     """Refresh access token using refresh token"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user or not user.is_active:
@@ -349,7 +350,8 @@ def refresh():
 def get_profile():
     """Get current user profile"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:
@@ -367,7 +369,8 @@ def get_profile():
 def update_profile():
     """Update user profile"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:

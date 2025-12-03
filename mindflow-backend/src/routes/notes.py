@@ -10,7 +10,8 @@ notes_bp = Blueprint('notes', __name__)
 @jwt_required()
 def get_notes():
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Get query parameters for filtering
         category = request.args.get('category')
@@ -43,7 +44,8 @@ def get_notes():
 @jwt_required()
 def create_note():
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -85,7 +87,8 @@ def create_note():
 @jwt_required()
 def get_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:
@@ -100,7 +103,8 @@ def get_note(note_id):
 @jwt_required()
 def update_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:
@@ -146,7 +150,8 @@ def update_note(note_id):
 @jwt_required()
 def delete_note(note_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         note = Note.query.filter_by(id=note_id, user_id=current_user_id).first()
         
         if not note:

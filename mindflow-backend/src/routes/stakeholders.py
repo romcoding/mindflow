@@ -10,7 +10,8 @@ stakeholders_bp = Blueprint('stakeholders', __name__)
 @jwt_required()
 def get_stakeholders():
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Get query parameters for filtering
         sentiment = request.args.get('sentiment')
@@ -39,7 +40,8 @@ def get_stakeholders():
 @jwt_required()
 def create_stakeholder():
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -102,7 +104,8 @@ def create_stakeholder():
 @jwt_required()
 def get_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -120,7 +123,8 @@ def get_stakeholder(stakeholder_id):
 @jwt_required()
 def update_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -209,7 +213,8 @@ def update_stakeholder(stakeholder_id):
 @jwt_required()
 def delete_stakeholder(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id
@@ -231,7 +236,8 @@ def delete_stakeholder(stakeholder_id):
 @jwt_required()
 def update_last_contact(stakeholder_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         stakeholder = Stakeholder.query.filter_by(
             id=stakeholder_id, 
             user_id=current_user_id

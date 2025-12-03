@@ -15,7 +15,8 @@ stakeholder_relationships_bp = Blueprint('stakeholder_relationships', __name__)
 def get_relationships():
     """Get all stakeholder relationships for the current user"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         relationships = StakeholderRelationship.query.filter_by(
             user_id=current_user_id,
             is_active=True
@@ -34,7 +35,8 @@ def get_relationships():
 def create_relationship():
     """Create a new stakeholder relationship"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -97,7 +99,8 @@ def create_relationship():
 def update_relationship(relationship_id):
     """Update a stakeholder relationship"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         relationship = StakeholderRelationship.query.filter_by(
             id=relationship_id,
             user_id=current_user_id
@@ -135,7 +138,8 @@ def update_relationship(relationship_id):
 def delete_relationship(relationship_id):
     """Delete a stakeholder relationship"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         relationship = StakeholderRelationship.query.filter_by(
             id=relationship_id,
             user_id=current_user_id
@@ -164,7 +168,8 @@ stakeholder_interactions_bp = Blueprint('stakeholder_interactions', __name__)
 def get_interactions():
     """Get all stakeholder interactions for the current user"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         stakeholder_id = request.args.get('stakeholder_id')
         
         query = StakeholderInteraction.query.filter_by(user_id=current_user_id)
@@ -187,7 +192,8 @@ def get_interactions():
 def create_interaction():
     """Create a new stakeholder interaction"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -261,7 +267,8 @@ def create_interaction():
 def update_interaction(interaction_id):
     """Update a stakeholder interaction"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         interaction = StakeholderInteraction.query.filter_by(
             id=interaction_id,
             user_id=current_user_id
@@ -322,7 +329,8 @@ def update_interaction(interaction_id):
 def delete_interaction(interaction_id):
     """Delete a stakeholder interaction"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         interaction = StakeholderInteraction.query.filter_by(
             id=interaction_id,
             user_id=current_user_id
@@ -347,7 +355,8 @@ def delete_interaction(interaction_id):
 def get_network_graph():
     """Get stakeholder network graph data for visualization"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Get all stakeholders for the user
         stakeholders = Stakeholder.query.filter_by(user_id=current_user_id).all()
@@ -408,7 +417,8 @@ def get_network_graph():
 def get_network_metrics():
     """Get network analysis metrics"""
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         
         # Basic counts
         total_stakeholders = Stakeholder.query.filter_by(user_id=current_user_id).count()

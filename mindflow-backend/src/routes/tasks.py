@@ -52,7 +52,8 @@ def get_tasks():
 @jwt_required()
 def create_task():
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         # Validate required fields
@@ -101,7 +102,8 @@ def create_task():
 @jwt_required()
 def get_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -116,7 +118,8 @@ def get_task(task_id):
 @jwt_required()
 def update_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -171,7 +174,8 @@ def update_task(task_id):
 @jwt_required()
 def delete_task(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
@@ -190,7 +194,8 @@ def delete_task(task_id):
 @jwt_required()
 def toggle_task_completion(task_id):
     try:
-        current_user_id = get_jwt_identity()
+        # get_jwt_identity() returns a string, convert to int for database queries
+        current_user_id = int(get_jwt_identity())
         task = Task.query.filter_by(id=task_id, user_id=current_user_id).first()
         
         if not task:
