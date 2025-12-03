@@ -182,19 +182,20 @@ def register():
         }
         # Log JWT config before creating token
         from flask import current_app
-        logging.info(f"Creating access token for user {user.id} with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
+        user_id_str = str(user.id)  # CRITICAL: Flask-JWT-Extended requires string identity
+        logging.info(f"Creating access token for user {user.id} (as string: '{user_id_str}') with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
         # CRITICAL: identity must be a string, not an integer
         access_token = create_access_token(
-            identity=str(user.id), 
+            identity=user_id_str, 
             additional_claims=additional_claims,
             expires_delta=timedelta(hours=24)
         )
         refresh_token = create_refresh_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(days=30)
         )
-        logging.info(f"Token created successfully, length: {len(access_token)}")
+        logging.info(f"Token created successfully, length: {len(access_token)}, identity type: {type(user_id_str).__name__}")
         audit_log("register", email, "success", None)
         return jsonify({
             'message': 'User registered successfully',
@@ -287,19 +288,20 @@ def login():
         }
         # Log JWT config before creating token
         from flask import current_app
-        logging.info(f"Creating access token for user {user.id} with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
+        user_id_str = str(user.id)  # CRITICAL: Flask-JWT-Extended requires string identity
+        logging.info(f"Creating access token for user {user.id} (as string: '{user_id_str}') with JWT_SECRET_KEY length: {len(current_app.config.get('JWT_SECRET_KEY', ''))}")
         # CRITICAL: identity must be a string, not an integer
         access_token = create_access_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(hours=24)
         )
         refresh_token = create_refresh_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(days=30)
         )
-        logging.info(f"Token created successfully, length: {len(access_token)}")
+        logging.info(f"Token created successfully, length: {len(access_token)}, identity type: {type(user_id_str).__name__}")
         audit_log("login", identifier, "success", None)
         return jsonify({
             'message': 'Login successful',
@@ -331,8 +333,9 @@ def refresh():
             'last_name': user.last_name
         }
         # CRITICAL: identity must be a string, not an integer
+        user_id_str = str(user.id)  # Ensure it's a string
         access_token = create_access_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(hours=24)
         )
@@ -631,13 +634,14 @@ def oauth_callback(provider):
             'last_name': user.last_name
         }
         # CRITICAL: identity must be a string, not an integer
+        user_id_str = str(user.id)  # Ensure it's a string
         access_token_jwt = create_access_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(hours=24)
         )
         refresh_token_jwt = create_refresh_token(
-            identity=str(user.id),
+            identity=user_id_str,
             additional_claims=additional_claims,
             expires_delta=timedelta(days=30)
         )

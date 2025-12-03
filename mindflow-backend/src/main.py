@@ -57,6 +57,7 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_ALGORITHM'] = 'HS256'  # Explicitly set algorithm
+app.config['JWT_IDENTITY_CLAIM'] = 'sub'  # Use 'sub' claim for identity
 
 # Log JWT configuration (without exposing the actual secret)
 logger.info(f"JWT configured: algorithm=HS256, secret_key_set={bool(jwt_secret)}, secret_key_length={len(jwt_secret)}, expires={app.config['JWT_ACCESS_TOKEN_EXPIRES']}")
