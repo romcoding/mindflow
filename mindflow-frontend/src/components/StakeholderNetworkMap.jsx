@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ZoomIn, ZoomOut, RotateCcw, Users, Network, Filter } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Users, Network, Filter, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const StakeholderNetworkMap = ({ 
   stakeholders = [], 
@@ -21,13 +23,59 @@ const StakeholderNetworkMap = ({
   const [selectedFilters, setSelectedFilters] = useState({
     sentiment: 'all',
     influence: 'all',
-    company: 'all'
+    company: 'all',
+    role: 'all',
+    strategic_value: 'all',
+    trust_level: 'all',
+    relationship_type: 'all'
   });
 
-  // Process data for D3
+  // Process data for D3 with filters
   const processData = () => {
-    // Create nodes from stakeholders
-    const nodes = stakeholders.map(stakeholder => ({
+    // Filter stakeholders based on selected filters
+    let filteredStakeholders = stakeholders.filter(stakeholder => {
+      if (selectedFilters.sentiment !== 'all' && stakeholder.sentiment !== selectedFilters.sentiment) return false;
+      if (selectedFilters.company !== 'all' && (stakeholder.company || 'Unknown') !== selectedFilters.company) return false;
+      if (selectedFilters.role !== 'all' && (stakeholder.role || 'Unknown') !== selectedFilters.role) return false;
+      if (selectedFilters.strategic_value !== 'all' && (stakeholder.strategic_value || 'medium') !== selectedFilters.strategic_value) return false;
+      if (selectedFilters.trust_level !== 'all') {
+        const trustLevel = stakeholder.trust_level || 5;
+        const filterLevel = parseInt(selectedFilters.trust_level);
+        if (filterLevel === 1 && trustLevel < 3) return true;
+        if (filterLevel === 2 && trustLevel >= 3 && trustLevel < 6) return true;
+        if (filterLevel === 3 && trustLevel >= 6 && trustLevel < 8) return true;
+        if (filterLevel === 4 && trustLevel >= 8) return true;
+        return false;
+      }
+      if (selectedFilters.influence !== 'all') {
+        const influence = stakeholder.influence || 5;
+        const filterInfluence = parseInt(selectedFilters.influence);
+        if (filterInfluence === 1 && influence < 3) return true;
+        if (filterInfluence === 2 && influence >= 3 && influence < 6) return true;
+        if (filterInfluence === 3 && influence >= 6 && influence < 8) return true;
+        if (filterInfluence === 4 && influence >= 8) return true;
+        return false;
+      }
+      return true;
+    });
+
+    // Filter relationships based on relationship type filter
+    let filteredRelationships = relationships;
+    if (selectedFilters.relationship_type !== 'all') {
+      filteredRelationships = relationships.filter(rel => 
+        rel.relationship_type === selectedFilters.relationship_type
+      );
+    }
+
+    // Only include relationships between filtered stakeholders
+    const filteredStakeholderIds = new Set(filteredStakeholders.map(s => s.id.toString()));
+    filteredRelationships = filteredRelationships.filter(rel => 
+      filteredStakeholderIds.has(rel.source_stakeholder_id.toString()) &&
+      filteredStakeholderIds.has(rel.target_stakeholder_id.toString())
+    );
+
+    // Create nodes from filtered stakeholders
+    const nodes = filteredStakeholders.map(stakeholder => ({
       id: stakeholder.id.toString(),
       name: stakeholder.name,
       role: stakeholder.role || 'Unknown',
@@ -46,8 +94,8 @@ const StakeholderNetworkMap = ({
       strokeWidth: getInfluenceStrokeWidth(stakeholder.influence)
     }));
 
-    // Create links from relationships
-    const links = relationships
+    // Create links from filtered relationships
+    const links = filteredRelationships
       .filter(rel => rel.is_active !== false)
       .map(rel => ({
         source: rel.source_stakeholder_id.toString(),
@@ -389,6 +437,11 @@ const StakeholderNetworkMap = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Re-run visualization when filters change
+  useEffect(() => {
+    // This will trigger the main visualization useEffect
+  }, [selectedFilters]);
+
   // Get unique values for filters
   const getUniqueCompanies = () => {
     const companies = [...new Set(stakeholders.map(s => s.company).filter(Boolean))];
@@ -473,6 +526,173 @@ const StakeholderNetworkMap = ({
           </TooltipProvider>
         </div>
       </div>
+
+      {/* Filters Panel */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFilters({
+                sentiment: 'all',
+                influence: 'all',
+                company: 'all',
+                role: 'all',
+                strategic_value: 'all',
+                trust_level: 'all',
+                relationship_type: 'all'
+              })}
+              className="h-6 text-xs"
+            >
+              Clear All
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {/* Company Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Company</Label>
+              <Select
+                value={selectedFilters.company}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, company: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {getUniqueCompanies().map(company => (
+                    <SelectItem key={company} value={company}>{company}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Role Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Role</Label>
+              <Select
+                value={selectedFilters.role}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, role: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {[...new Set(stakeholders.map(s => s.role).filter(Boolean))].sort().map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sentiment Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Sentiment</Label>
+              <Select
+                value={selectedFilters.sentiment}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, sentiment: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="positive">Positive</SelectItem>
+                  <SelectItem value="neutral">Neutral</SelectItem>
+                  <SelectItem value="negative">Negative</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Influence Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Influence</Label>
+              <Select
+                value={selectedFilters.influence}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, influence: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="1">Low (1-2)</SelectItem>
+                  <SelectItem value="2">Medium (3-5)</SelectItem>
+                  <SelectItem value="3">High (6-7)</SelectItem>
+                  <SelectItem value="4">Very High (8-10)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Strategic Value Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Strategic Value</Label>
+              <Select
+                value={selectedFilters.strategic_value}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, strategic_value: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Trust Level Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Trust Level</Label>
+              <Select
+                value={selectedFilters.trust_level}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, trust_level: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="1">Low (1-2)</SelectItem>
+                  <SelectItem value="2">Medium (3-5)</SelectItem>
+                  <SelectItem value="3">High (6-7)</SelectItem>
+                  <SelectItem value="4">Very High (8-10)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Relationship Type Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Relationship</Label>
+              <Select
+                value={selectedFilters.relationship_type}
+                onValueChange={(value) => setSelectedFilters({ ...selectedFilters, relationship_type: value })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {[...new Set(relationships.map(r => r.relationship_type).filter(Boolean))].sort().map(type => (
+                    <SelectItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Legend */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">

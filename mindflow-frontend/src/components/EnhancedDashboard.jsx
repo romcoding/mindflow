@@ -69,44 +69,62 @@ const TaskEditForm = ({ task, onSave, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="title">Title</Label>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="title" className="text-sm font-medium">Title</Label>
         <Input
           id="title"
           value={formData.title}
           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
           required
+          className="mt-1"
         />
       </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
+      <div className="space-y-2">
+        <Label htmlFor="description" className="text-sm font-medium">Description</Label>
         <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           rows={4}
+          className="mt-1"
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="status">Status</Label>
-          <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-            <SelectTrigger>
+        <div className="space-y-2">
+          <Label htmlFor="status" className="text-sm font-medium">Status</Label>
+          <Select 
+            value={formData.status} 
+            onValueChange={(value) => {
+              // Map status to board_column
+              const statusToColumn = {
+                'todo': 'todo',
+                'in_progress': 'in_progress',
+                'waiting': 'review',
+                'done': 'done'
+              };
+              setFormData({ 
+                ...formData, 
+                status: value,
+                board_column: statusToColumn[value] || 'todo'
+              });
+            }}
+          >
+            <SelectTrigger className="mt-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todo">To Do</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="waiting">Waiting</SelectItem>
+              <SelectItem value="waiting">Review</SelectItem>
               <SelectItem value="done">Done</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <Label htmlFor="priority">Priority</Label>
+        <div className="space-y-2">
+          <Label htmlFor="priority" className="text-sm font-medium">Priority</Label>
           <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
-            <SelectTrigger>
+            <SelectTrigger className="mt-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -118,13 +136,14 @@ const TaskEditForm = ({ task, onSave, onCancel }) => {
           </Select>
         </div>
       </div>
-      <div>
-        <Label htmlFor="due_date">Due Date</Label>
+      <div className="space-y-2">
+        <Label htmlFor="due_date" className="text-sm font-medium">Due Date</Label>
         <Input
           id="due_date"
           type="date"
           value={formData.due_date}
           onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+          className="mt-1"
         />
       </div>
       <div className="flex justify-end gap-2">
@@ -152,21 +171,22 @@ const NoteEditForm = ({ note, onSave, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="content">Content</Label>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="content" className="text-sm font-medium">Content</Label>
         <Textarea
           id="content"
           value={formData.content}
           onChange={(e) => setFormData({ ...formData, content: e.target.value })}
           rows={8}
           required
+          className="mt-1"
         />
       </div>
-      <div>
-        <Label htmlFor="category">Category</Label>
+      <div className="space-y-2">
+        <Label htmlFor="category" className="text-sm font-medium">Category</Label>
         <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-          <SelectTrigger>
+          <SelectTrigger className="mt-1">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -543,7 +563,17 @@ const EnhancedDashboard = () => {
   const handleTaskSave = async (taskData) => {
     try {
       if (selectedTask && selectedTask.id) {
-        await tasksAPI.updateTask(selectedTask.id, taskData);
+        // If board_column changed, use moveTask endpoint
+        if (taskData.board_column && taskData.board_column !== selectedTask.board_column) {
+          await tasksAPI.moveTask(selectedTask.id, taskData.board_column, null);
+          // Update other fields separately
+          const { board_column, ...otherFields } = taskData;
+          if (Object.keys(otherFields).length > 0) {
+            await tasksAPI.updateTask(selectedTask.id, otherFields);
+          }
+        } else {
+          await tasksAPI.updateTask(selectedTask.id, taskData);
+        }
         alert('Task updated successfully!');
       }
       setIsTaskEditOpen(false);
