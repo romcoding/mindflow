@@ -19,8 +19,19 @@ export default defineConfig({
       onwarn(warning, warn) {
         // Suppress certain warnings
         if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
+        if (warning.code === 'CIRCULAR_DEPENDENCY') {
+          console.warn('Circular dependency:', warning.message);
+          return;
+        }
         warn(warning);
       },
     },
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
+  },
+  optimizeDeps: {
+    include: ['d3', 'axios', 'react', 'react-dom'],
   },
 })
