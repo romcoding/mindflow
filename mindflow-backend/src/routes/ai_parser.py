@@ -52,9 +52,11 @@ def parse_content():
         
         # Determine content type first
         type_prompt = f"""Analyze the following text and determine if it's about:
-1. A task/to-do item
-2. A person/stakeholder/contact
-3. A general note
+1. A task/to-do item - something that needs to be done, an action item, a reminder
+2. A person/stakeholder/contact - information about a person, someone's name, contact details, someone you met or know
+3. A general note - any other information, thoughts, observations, or general notes
+
+IMPORTANT: If the text mentions a person's name, contact information, role, company, or any personal details, it should be classified as "stakeholder" even if it also contains other information.
 
 Text: "{text}"
 

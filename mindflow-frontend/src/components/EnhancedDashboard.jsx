@@ -553,9 +553,11 @@ const EnhancedDashboard = () => {
 
     // Try to get AI analysis if we don't have it or if it's outdated
     let analysis = analysisResult;
-    if (!analysis || (type && analysis.type !== type)) {
+    
+    // If a specific type is requested, always re-parse to get the right data structure
+    if (!analysis || type) {
       try {
-        // Try AI parsing first
+        // Try AI parsing first - always re-parse when type is forced to get correct data
         const aiResponse = await aiAPI.parseContent(quickAddText);
         if (aiResponse?.data?.success) {
           analysis = aiResponse.data;
@@ -569,8 +571,18 @@ const EnhancedDashboard = () => {
         analysis = analyzeContent(quickAddText);
       }
       
+      // Override type if explicitly requested
       if (type) {
         analysis = { ...analysis, type };
+        
+        // If forcing stakeholder type but AI didn't extract stakeholder info, try to extract it
+        if (type === 'stakeholder' && !analysis.stakeholder_info && !analysis.stakeholderInfo) {
+          // Use local parsing to extract stakeholder info
+          const localAnalysis = analyzeContent(quickAddText);
+          if (localAnalysis.stakeholderInfo) {
+            analysis.stakeholderInfo = localAnalysis.stakeholderInfo;
+          }
+        }
       }
       setAnalysisResult(analysis);
     } else if (type) {
@@ -603,7 +615,32 @@ const EnhancedDashboard = () => {
         alert('Task created successfully!');
       } else if (analysis.type === 'stakeholder') {
         const stakeholderInfo = analysis.stakeholder_info || analysis.stakeholderInfo || {};
-        const name = stakeholderInfo.name || analysis.extractedNames?.[0] || 'New Contact';
+        
+        // Extract name - try multiple sources and ensure it's never empty
+        let name = stakeholderInfo.name;
+        if (!name || name.trim() === '') {
+          // Try extracted names from local parsing
+          if (analysis.extractedNames && analysis.extractedNames.length > 0) {
+            name = analysis.extractedNames[0];
+          }
+        }
+        
+        // If still no name, try to extract from text (first capitalized words)
+        if (!name || name.trim() === '' || name === 'New Contact') {
+          const nameMatches = quickAddText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/);
+          if (nameMatches && nameMatches[0]) {
+            name = nameMatches[0];
+          } else {
+            // Last resort: use first few words of text
+            const words = quickAddText.trim().split(/\s+/);
+            name = words.slice(0, 2).join(' ') || 'New Contact';
+          }
+        }
+        
+        // Ensure name is not empty
+        if (!name || name.trim() === '') {
+          name = 'New Contact';
+        }
         
         // Combine personal_notes with other_info if available
         let personalNotes = stakeholderInfo.personal_notes || quickAddText;
@@ -612,7 +649,7 @@ const EnhancedDashboard = () => {
         }
         
         const stakeholderData = {
-          name: name,
+          name: name.trim(),
           role: stakeholderInfo.role || null,
           company: stakeholderInfo.company || null,
           email: stakeholderInfo.email || null,
@@ -622,13 +659,15 @@ const EnhancedDashboard = () => {
           job_title: stakeholderInfo.job_title || null,
           location: stakeholderInfo.location || null,
           linkedin_url: stakeholderInfo.linkedin_url || null,
-          personal_notes: personalNotes.trim(),
+          personal_notes: personalNotes.trim() || null,
           sentiment: 'neutral',
           influence: 5,
           interest: 5
         };
-        console.log('Creating stakeholder with AI-extracted info:', stakeholderData);
-        await stakeholdersAPI.createStakeholder(stakeholderData);
+        
+        console.log('Creating stakeholder with extracted info:', stakeholderData);
+        const response = await stakeholdersAPI.createStakeholder(stakeholderData);
+        console.log('Stakeholder creation response:', response.data);
         alert('Contact created successfully!');
       } else {
         const noteData = {
@@ -659,7 +698,17 @@ const EnhancedDashboard = () => {
         localStorage.removeItem('user');
         window.location.reload();
       } else {
-        errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create item';
+        const errorData = error.response?.data;
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+          if (errorData.details) {
+            errorMessage += `: ${errorData.details}`;
+          }
+        } else if (errorData?.message) {
+          errorMessage = errorData.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
       }
       
       alert(errorMessage);
