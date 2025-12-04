@@ -1,8 +1,8 @@
 {
-  "buildCommand": "cd mindflow-frontend && pnpm run build",
-  "outputDirectory": "mindflow-frontend/dist",
-  "devCommand": "cd mindflow-frontend && pnpm run dev",
-  "installCommand": "cd mindflow-frontend && pnpm install",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
+  "devCommand": "pnpm run dev",
+  "installCommand": "pnpm install",
   "framework": "vite",
   "rewrites": [
     {
