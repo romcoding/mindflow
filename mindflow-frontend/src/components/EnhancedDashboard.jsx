@@ -557,7 +557,7 @@ const EnhancedDashboard = () => {
       try {
         // Try AI parsing first
         const aiResponse = await aiAPI.parseContent(quickAddText);
-        if (aiResponse.data.success) {
+        if (aiResponse?.data?.success) {
           analysis = aiResponse.data;
         } else {
           // Fallback to local parsing
@@ -1439,20 +1439,25 @@ const EnhancedDashboard = () => {
                   setQuickAddText(text);
                   if (text && text.length > 10) {
                     // Use AI parsing for better results (async, but don't block)
-                    aiAPI.parseContent(text)
-                      .then((response) => {
-                        if (response.data.success) {
-                          setAnalysisResult(response.data);
-                        } else {
-                          // Fallback to local parsing
+                    try {
+                      aiAPI.parseContent(text)
+                        .then((response) => {
+                          if (response?.data?.success) {
+                            setAnalysisResult(response.data);
+                          } else {
+                            // Fallback to local parsing
+                            setAnalysisResult(analyzeContent(text));
+                          }
+                        })
+                        .catch((error) => {
+                          console.log('AI parsing not available, using local parsing:', error);
+                          // Fallback to local parsing if AI is not available
                           setAnalysisResult(analyzeContent(text));
-                        }
-                      })
-                      .catch((error) => {
-                        console.log('AI parsing not available, using local parsing:', error);
-                        // Fallback to local parsing if AI is not available
-                        setAnalysisResult(analyzeContent(text));
-                      });
+                        });
+                    } catch (error) {
+                      // If aiAPI is not available, use local parsing
+                      setAnalysisResult(analyzeContent(text));
+                    }
                   } else if (text) {
                     // For short text, use local parsing
                     setAnalysisResult(analyzeContent(text));
