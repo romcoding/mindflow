@@ -691,7 +691,7 @@ const EnhancedDashboard = () => {
         console.log('🎤 Voice recording started');
       };
 
-      recognition.onresult = (event) => {
+      recognition.onresult = async (event) => {
         let interimTranscript = '';
         let finalTranscript = '';
 
@@ -709,18 +709,19 @@ const EnhancedDashboard = () => {
         setQuickAddText(fullText);
         
         // Only analyze when we have final results and sufficient text
-        if (finalTranscript.trim() && finalTranscript.trim().length > 10) {
+        const finalText = finalTranscript.trim();
+        if (finalText && finalText.length > 10) {
           try {
             // Try AI parsing first
-            const aiResponse = await aiAPI.parseContent(finalTranscript.trim());
+            const aiResponse = await aiAPI.parseContent(finalText);
             if (aiResponse?.data?.success) {
               setAnalysisResult(aiResponse.data);
             } else {
-              setAnalysisResult(analyzeContent(finalTranscript.trim()));
+              setAnalysisResult(analyzeContent(finalText));
             }
           } catch (error) {
             console.log('AI parsing not available, using local parsing:', error);
-            setAnalysisResult(analyzeContent(finalTranscript.trim()));
+            setAnalysisResult(analyzeContent(finalText));
           }
         }
       };
