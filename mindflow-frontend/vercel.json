@@ -1,16 +1,13 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist",
-  "devCommand": "pnpm run dev",
-  "installCommand": "pnpm install",
+  "buildCommand": "cd mindflow-frontend && pnpm run build",
+  "outputDirectory": "mindflow-frontend/dist",
+  "devCommand": "cd mindflow-frontend && pnpm run dev",
+  "installCommand": "cd mindflow-frontend && pnpm install",
   "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_API_URL": "https://mindflow-backend-9ec8.onrender.com/api"
-  }
+  ]
 }
