@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --mode production",
-    "build:verbose": "vite build --mode production --logLevel info",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

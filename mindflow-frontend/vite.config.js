@@ -15,25 +15,7 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
-    chunkSizeWarningLimit: 1000,
     rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // Split node_modules into separate chunks
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            if (id.includes('d3')) {
-              return 'd3-vendor';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'ui-vendor';
-            }
-            return 'vendor';
-          }
-        },
-      },
       onwarn(warning, warn) {
         // Suppress certain warnings
         if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
@@ -43,10 +25,6 @@ export default defineConfig({
         }
         warn(warning);
       },
-    },
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true,
     },
   },
   optimizeDeps: {
