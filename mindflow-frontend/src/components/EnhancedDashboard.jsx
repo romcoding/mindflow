@@ -713,7 +713,7 @@ const EnhancedDashboard = () => {
           try {
             // Try AI parsing first
             const aiResponse = await aiAPI.parseContent(finalTranscript.trim());
-            if (aiResponse.data.success) {
+            if (aiResponse?.data?.success) {
               setAnalysisResult(aiResponse.data);
             } else {
               setAnalysisResult(analyzeContent(finalTranscript.trim()));
