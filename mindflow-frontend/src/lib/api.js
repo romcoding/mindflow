@@ -22,9 +22,12 @@ const getBaseURL = () => {
   if (envURL && typeof envURL === 'string') {
     // Validate that baseURL is a valid HTTP/HTTPS URL (not a database connection string)
     if (envURL.startsWith('postgresql://') || envURL.startsWith('postgres://') || envURL.startsWith('mysql://')) {
-      console.error('❌ ERROR: VITE_API_URL is set to a database connection string instead of the backend API URL!');
-      console.error('Current value:', envURL);
-      console.error('Please set VITE_API_URL in Vercel to: https://mindflow-backend-9ec8.onrender.com/api');
+      // Only log in dev - this check happens at build time too
+      if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+        console.error('❌ ERROR: VITE_API_URL is set to a database connection string instead of the backend API URL!');
+        console.error('Current value:', envURL);
+        console.error('Please set VITE_API_URL in Vercel to: https://mindflow-backend-9ec8.onrender.com/api');
+      }
       return 'https://mindflow-backend-9ec8.onrender.com/api';
     }
     return envURL;

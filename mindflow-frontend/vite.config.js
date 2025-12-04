@@ -31,8 +31,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['d3', 'axios', 'react', 'react-dom'],
   },
-  logLevel: 'info',
-  esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' },
-  },
 })
