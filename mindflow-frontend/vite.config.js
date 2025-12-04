@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    extensions: ['.jsx', '.js', '.json'],
   },
   build: {
     outDir: 'dist',
@@ -30,4 +31,5 @@ export default defineConfig({
   optimizeDeps: {
     include: ['d3', 'axios', 'react', 'react-dom'],
   },
+  logLevel: 'info',
 })

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider } from './hooks/useAuth.jsx';
 import EnhancedDashboard from './components/EnhancedDashboard.jsx';
 import './App.css';
 // Create a client
