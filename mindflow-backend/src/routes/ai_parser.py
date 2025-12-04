@@ -52,6 +52,37 @@ def get_openai_client():
         logger.error(traceback.format_exc())
         return None
 
+@ai_parser_bp.route('/ai/check-config', methods=['GET'])
+@jwt_required()
+def check_ai_config():
+    """Diagnostic endpoint to check OpenAI configuration"""
+    try:
+        api_key_set = bool(OPENAI_API_KEY)
+        api_key_length = len(OPENAI_API_KEY) if OPENAI_API_KEY else 0
+        api_key_prefix = OPENAI_API_KEY[:10] + "..." if OPENAI_API_KEY and len(OPENAI_API_KEY) > 10 else "N/A"
+        
+        client = get_openai_client()
+        client_available = client is not None
+        
+        # Try to get OpenAI library version
+        try:
+            import openai
+            openai_version = openai.__version__
+        except:
+            openai_version = "Unknown"
+        
+        return jsonify({
+            'openai_api_key_set': api_key_set,
+            'openai_api_key_length': api_key_length,
+            'openai_api_key_prefix': api_key_prefix,
+            'openai_client_available': client_available,
+            'openai_library_version': openai_version
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
+
 @ai_parser_bp.route('/ai/parse-content', methods=['POST'])
 @jwt_required()
 def parse_content():
