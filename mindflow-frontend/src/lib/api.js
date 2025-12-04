@@ -34,8 +34,11 @@ const getBaseURL = () => {
 
 const baseURL = getBaseURL();
 
-console.log('🔗 API Base URL:', baseURL);
-console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
+// Only log in development to avoid build issues
+if (import.meta.env?.DEV) {
+  console.log('🔗 API Base URL:', baseURL);
+  console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
+}
 
 const api = axios.create({ 
   baseURL,
@@ -51,20 +54,22 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     // Ensure Authorization header is set correctly
     config.headers.Authorization = `Bearer ${token.trim()}`;
-    // Log token presence for debugging (not the actual token)
-    if (config.url && !config.url.includes('/auth/')) {
+    // Log token presence for debugging (not the actual token) - only in dev
+    if (import.meta.env?.DEV && config.url && !config.url.includes('/auth/')) {
       console.log(`🔑 Token attached to request: ${config.method?.toUpperCase()} ${config.url}`);
       console.log(`🔑 Token length: ${token.length}, starts with: ${token.substring(0, 20)}...`);
     }
   } else {
-    // Warn if token is missing for protected endpoints
-    if (config.url && !config.url.includes('/auth/')) {
+    // Warn if token is missing for protected endpoints - only in dev
+    if (import.meta.env?.DEV && config.url && !config.url.includes('/auth/')) {
       console.warn(`⚠️ No token available for request: ${config.method?.toUpperCase()} ${config.url}`);
     }
   }
-  // Log request for debugging (sanitize sensitive data)
+  // Log request for debugging (sanitize sensitive data) - only in dev
   const sanitizedData = config.data ? sanitizeRequestData(config.data) : '';
-  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, sanitizedData);
+  if (import.meta.env?.DEV) {
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, sanitizedData);
+  }
   return config;
 });
 
@@ -77,7 +82,9 @@ api.interceptors.response.use(
       const status = error.response.status;
       const data = error.response.data;
       
-      console.error(`API Error [${status}]:`, data);
+      if (import.meta.env?.DEV) {
+        console.error(`API Error [${status}]:`, data);
+      }
       
       // Handle 401 - Unauthorized (token expired/invalid)
       // Don't handle 401 for auth endpoints (login, register, refresh) - those are expected
@@ -87,7 +94,9 @@ api.interceptors.response.use(
         if (refreshToken && !error.config._retry) {
           error.config._retry = true;
           try {
-            console.log('🔄 Attempting token refresh due to 401 error');
+            if (import.meta.env?.DEV) {
+              console.log('🔄 Attempting token refresh due to 401 error');
+            }
             const refreshResponse = await api.post('/auth/refresh', {}, {
               headers: { Authorization: `Bearer ${refreshToken}` }
             });
@@ -98,7 +107,9 @@ api.interceptors.response.use(
                 if (refreshResponse.data.user) {
                   localStorage.setItem('user', JSON.stringify(refreshResponse.data.user));
                 }
-                console.log('✅ Token refreshed successfully');
+                if (import.meta.env?.DEV) {
+                  console.log('✅ Token refreshed successfully');
+                }
                 // Retry original request with new token
                 error.config.headers.Authorization = `Bearer ${newToken}`;
                 return api(error.config);
@@ -106,7 +117,9 @@ api.interceptors.response.use(
             }
           } catch (refreshError) {
             // Refresh failed, clear tokens and redirect to login
-            console.error('❌ Token refresh failed:', refreshError);
+            if (import.meta.env?.DEV) {
+              console.error('❌ Token refresh failed:', refreshError);
+            }
             if (typeof window !== 'undefined') {
               // Only clear tokens if refresh actually failed, not on network errors
               if (refreshError.response && refreshError.response.status === 401) {
@@ -114,28 +127,34 @@ api.interceptors.response.use(
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user');
                 // Don't reload immediately - let the auth hook handle it
-                console.log('🔒 Tokens cleared due to refresh failure');
+                if (import.meta.env?.DEV) {
+                  console.log('🔒 Tokens cleared due to refresh failure');
+                }
               }
             }
           }
-        } else if (!refreshToken) {
+        } else if (!refreshToken && import.meta.env?.DEV) {
           console.warn('⚠️ No refresh token available for 401 error');
         }
       }
     } else if (error.request) {
       // Request made but no response
-      console.error('No response from server:', error.request);
-      console.error('Request URL:', error.config?.url);
-      console.error('Request method:', error.config?.method);
-      console.error('Request baseURL:', error.config?.baseURL);
+      if (import.meta.env?.DEV) {
+        console.error('No response from server:', error.request);
+        console.error('Request URL:', error.config?.url);
+        console.error('Request method:', error.config?.method);
+        console.error('Request baseURL:', error.config?.baseURL);
+      }
       error.response = {
         data: { error: 'Network error. Please check your connection and try again.' }
       };
     } else {
       // Error in request setup
-      console.error('Request error:', error.message);
-      console.error('Error config:', error.config);
-      console.error('Full error:', error);
+      if (import.meta.env?.DEV) {
+        console.error('Request error:', error.message);
+        console.error('Error config:', error.config);
+        console.error('Full error:', error);
+      }
       error.response = {
         data: { error: error.message || 'Request failed. Please try again.' }
       };
