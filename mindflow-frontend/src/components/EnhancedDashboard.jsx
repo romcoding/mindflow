@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
-import { tasksAPI, stakeholdersAPI, notesAPI } from '../lib/api.js';
+import { tasksAPI, stakeholdersAPI, notesAPI, aiAPI } from '../lib/api.js';
 import AuthSystem from './AuthSystem.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -551,10 +551,24 @@ const EnhancedDashboard = () => {
       return;
     }
 
-    // Ensure we have analysis result - create it if missing
+    // Try to get AI analysis if we don't have it or if it's outdated
     let analysis = analysisResult;
     if (!analysis || (type && analysis.type !== type)) {
-      analysis = analyzeContent(quickAddText);
+      try {
+        // Try AI parsing first
+        const aiResponse = await aiAPI.parseContent(quickAddText);
+        if (aiResponse.data.success) {
+          analysis = aiResponse.data;
+        } else {
+          // Fallback to local parsing
+          analysis = analyzeContent(quickAddText);
+        }
+      } catch (error) {
+        console.log('AI parsing not available, using local parsing:', error);
+        // Fallback to local parsing
+        analysis = analyzeContent(quickAddText);
+      }
+      
       if (type) {
         analysis = { ...analysis, type };
       }
@@ -575,20 +589,28 @@ const EnhancedDashboard = () => {
       console.log('🔑 Token available for quick add:', token.substring(0, 20) + '...');
       
       if (analysis.type === 'task') {
+        const taskInfo = analysis.task_info || {};
         const taskData = {
-          title: quickAddText,
-          description: '',
-          priority: analysis.priority || 'medium',
-          due_date: analysis.dueDate,
-          status: 'todo',
+          title: taskInfo.title || quickAddText,
+          description: taskInfo.description || '',
+          priority: taskInfo.priority || analysis.priority || 'medium',
+          due_date: taskInfo.due_date || analysis.dueDate || null,
+          status: taskInfo.status || 'todo',
           board_column: 'todo'
         };
         console.log('Creating task:', taskData);
         await tasksAPI.createTask(taskData);
         alert('Task created successfully!');
       } else if (analysis.type === 'stakeholder') {
-        const stakeholderInfo = analysis.stakeholderInfo || {};
+        const stakeholderInfo = analysis.stakeholder_info || analysis.stakeholderInfo || {};
         const name = stakeholderInfo.name || analysis.extractedNames?.[0] || 'New Contact';
+        
+        // Combine personal_notes with other_info if available
+        let personalNotes = stakeholderInfo.personal_notes || quickAddText;
+        if (stakeholderInfo.other_info && stakeholderInfo.other_info !== personalNotes) {
+          personalNotes = `${personalNotes}\n\nAdditional info: ${stakeholderInfo.other_info}`;
+        }
+        
         const stakeholderData = {
           name: name,
           role: stakeholderInfo.role || null,
@@ -598,12 +620,14 @@ const EnhancedDashboard = () => {
           birthday: stakeholderInfo.birthday || null,
           department: stakeholderInfo.department || null,
           job_title: stakeholderInfo.job_title || null,
-          personal_notes: quickAddText,
+          location: stakeholderInfo.location || null,
+          linkedin_url: stakeholderInfo.linkedin_url || null,
+          personal_notes: personalNotes.trim(),
           sentiment: 'neutral',
           influence: 5,
           interest: 5
         };
-        console.log('Creating stakeholder with extracted info:', stakeholderData);
+        console.log('Creating stakeholder with AI-extracted info:', stakeholderData);
         await stakeholdersAPI.createStakeholder(stakeholderData);
         alert('Contact created successfully!');
       } else {
@@ -1399,10 +1423,27 @@ const EnhancedDashboard = () => {
               <Textarea
                 placeholder="What's on your mind? Speak or type your thoughts..."
                 value={quickAddText}
-                onChange={(e) => {
-                  setQuickAddText(e.target.value);
-                  if (e.target.value) {
-                    setAnalysisResult(analyzeContent(e.target.value));
+                onChange={async (e) => {
+                  const text = e.target.value;
+                  setQuickAddText(text);
+                  if (text && text.length > 10) {
+                    // Use AI parsing for better results
+                    try {
+                      const response = await aiAPI.parseContent(text);
+                      if (response.data.success) {
+                        setAnalysisResult(response.data);
+                      } else {
+                        // Fallback to local parsing
+                        setAnalysisResult(analyzeContent(text));
+                      }
+                    } catch (error) {
+                      console.log('AI parsing not available, using local parsing:', error);
+                      // Fallback to local parsing if AI is not available
+                      setAnalysisResult(analyzeContent(text));
+                    }
+                  } else if (text) {
+                    // For short text, use local parsing
+                    setAnalysisResult(analyzeContent(text));
                   } else {
                     setAnalysisResult(null);
                   }
@@ -1435,43 +1476,65 @@ const EnhancedDashboard = () => {
                   <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
                     <Brain className="h-4 w-4" />
                     AI Analysis
+                    {analysisResult.success !== false && (
+                      <Badge variant="outline" className="ml-auto text-xs">AI Powered</Badge>
+                    )}
                   </h4>
                   <div className="space-y-2">
                     <p className="text-sm text-blue-800">
                       Detected as: <Badge variant="outline" className="ml-1">{analysisResult.type}</Badge>
-                      {analysisResult.priority && (
+                      {analysisResult.task_info?.priority && (
                         <>
-                          {' '}• Priority: <Badge variant="outline" className="ml-1">{analysisResult.priority}</Badge>
+                          {' '}• Priority: <Badge variant="outline" className="ml-1">{analysisResult.task_info.priority}</Badge>
                         </>
                       )}
-                      {analysisResult.dueDate && (
+                      {analysisResult.task_info?.due_date && (
                         <>
-                          {' '}• Due: <Badge variant="outline" className="ml-1">{analysisResult.dueDate}</Badge>
+                          {' '}• Due: <Badge variant="outline" className="ml-1">{analysisResult.task_info.due_date}</Badge>
                         </>
                       )}
                     </p>
-                    {analysisResult.type === 'stakeholder' && analysisResult.stakeholderInfo && (
+                    {analysisResult.type === 'stakeholder' && (analysisResult.stakeholder_info || analysisResult.stakeholderInfo) && (
                       <div className="mt-2 pt-2 border-t border-blue-200 space-y-1 text-xs">
-                        {analysisResult.stakeholderInfo.role && (
-                          <p>Role: <span className="font-medium">{analysisResult.stakeholderInfo.role}</span></p>
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.name && (
+                          <p><span className="font-semibold">Name:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).name}</span></p>
                         )}
-                        {analysisResult.stakeholderInfo.company && (
-                          <p>Company: <span className="font-medium">{analysisResult.stakeholderInfo.company}</span></p>
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.company && (
+                          <p><span className="font-semibold">Company:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).company}</span></p>
                         )}
-                        {analysisResult.stakeholderInfo.email && (
-                          <p>Email: <span className="font-medium">{analysisResult.stakeholderInfo.email}</span></p>
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.role && (
+                          <p><span className="font-semibold">Role:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).role}</span></p>
                         )}
-                        {analysisResult.stakeholderInfo.phone && (
-                          <p>Phone: <span className="font-medium">{analysisResult.stakeholderInfo.phone}</span></p>
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.job_title && (
+                          <p><span className="font-semibold">Job Title:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).job_title}</span></p>
                         )}
-                        {analysisResult.stakeholderInfo.birthday && (
-                          <p>Birthday: <span className="font-medium">{analysisResult.stakeholderInfo.birthday}</span></p>
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.department && (
+                          <p><span className="font-semibold">Department:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).department}</span></p>
+                        )}
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.email && (
+                          <p><span className="font-semibold">Email:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).email}</span></p>
+                        )}
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.phone && (
+                          <p><span className="font-semibold">Phone:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).phone}</span></p>
+                        )}
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.location && (
+                          <p><span className="font-semibold">Location:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).location}</span></p>
+                        )}
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.birthday && (
+                          <p><span className="font-semibold">Birthday:</span> <span className="font-medium">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).birthday}</span></p>
+                        )}
+                        {(analysisResult.stakeholder_info || analysisResult.stakeholderInfo)?.personal_notes && (
+                          <p className="mt-2 pt-2 border-t border-blue-200">
+                            <span className="font-semibold">Notes:</span> <span className="text-blue-700">{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).personal_notes.substring(0, 100)}{(analysisResult.stakeholder_info || analysisResult.stakeholderInfo).personal_notes.length > 100 ? '...' : ''}</span>
+                          </p>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-blue-600">
-                      Confidence: {Math.round(analysisResult.confidence * 100)}%
-                    </p>
+                    {analysisResult.confidence && (
+                      <p className="text-xs text-blue-600">
+                        Confidence: {Math.round(analysisResult.confidence * 100)}%
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

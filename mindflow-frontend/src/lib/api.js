@@ -181,4 +181,8 @@ export const notesAPI = {
   deleteNote: (noteId) => api.delete(`/notes/${noteId}`),
 };
 
+export const aiAPI = {
+  parseContent: (text) => api.post('/ai/parse-content', { text }),
+};
+
 export default api;
