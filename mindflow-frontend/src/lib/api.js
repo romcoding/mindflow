@@ -17,16 +17,22 @@ function sanitizeRequestData(data) {
 }
 
 // Base URL for the backend API. Configure in Vercel as VITE_API_URL.
-let baseURL = import.meta.env?.VITE_API_URL || 'https://mindflow-backend-9ec8.onrender.com/api';
+const getBaseURL = () => {
+  const envURL = import.meta.env?.VITE_API_URL;
+  if (envURL && typeof envURL === 'string') {
+    // Validate that baseURL is a valid HTTP/HTTPS URL (not a database connection string)
+    if (envURL.startsWith('postgresql://') || envURL.startsWith('postgres://') || envURL.startsWith('mysql://')) {
+      console.error('❌ ERROR: VITE_API_URL is set to a database connection string instead of the backend API URL!');
+      console.error('Current value:', envURL);
+      console.error('Please set VITE_API_URL in Vercel to: https://mindflow-backend-9ec8.onrender.com/api');
+      return 'https://mindflow-backend-9ec8.onrender.com/api';
+    }
+    return envURL;
+  }
+  return 'https://mindflow-backend-9ec8.onrender.com/api';
+};
 
-// Validate that baseURL is a valid HTTP/HTTPS URL (not a database connection string)
-if (baseURL && (baseURL.startsWith('postgresql://') || baseURL.startsWith('postgres://') || baseURL.startsWith('mysql://'))) {
-  console.error('❌ ERROR: VITE_API_URL is set to a database connection string instead of the backend API URL!');
-  console.error('Current value:', baseURL);
-  console.error('Please set VITE_API_URL in Vercel to: https://mindflow-backend-9ec8.onrender.com/api');
-  // Fallback to default backend URL
-  baseURL = 'https://mindflow-backend-9ec8.onrender.com/api';
-}
+const baseURL = getBaseURL();
 
 console.log('🔗 API Base URL:', baseURL);
 console.log('🌍 Environment:', import.meta.env?.MODE || 'unknown');
