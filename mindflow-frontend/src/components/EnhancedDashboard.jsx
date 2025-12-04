@@ -708,9 +708,20 @@ const EnhancedDashboard = () => {
         const fullText = finalTranscript + interimTranscript;
         setQuickAddText(fullText);
         
-        // Only analyze when we have final results
-        if (finalTranscript.trim()) {
-          setAnalysisResult(analyzeContent(finalTranscript.trim()));
+        // Only analyze when we have final results and sufficient text
+        if (finalTranscript.trim() && finalTranscript.trim().length > 10) {
+          try {
+            // Try AI parsing first
+            const aiResponse = await aiAPI.parseContent(finalTranscript.trim());
+            if (aiResponse.data.success) {
+              setAnalysisResult(aiResponse.data);
+            } else {
+              setAnalysisResult(analyzeContent(finalTranscript.trim()));
+            }
+          } catch (error) {
+            console.log('AI parsing not available, using local parsing:', error);
+            setAnalysisResult(analyzeContent(finalTranscript.trim()));
+          }
         }
       };
 
