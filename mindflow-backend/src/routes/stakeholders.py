@@ -44,6 +44,20 @@ def create_stakeholder():
         current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
+        # Helper to safely strip optional string fields that might be None
+        def clean_optional(value):
+            """
+            Safely strip a value that may be None or non-string.
+            Returns None if the resulting string is empty.
+            """
+            if value is None:
+                return None
+            try:
+                value_str = str(value).strip()
+            except Exception:
+                return None
+            return value_str or None
+        
         # Validate required fields
         if not data.get('name'):
             return jsonify({'error': 'Name is required'}), 400
@@ -69,15 +83,15 @@ def create_stakeholder():
         # Create stakeholder
         stakeholder = Stakeholder(
             user_id=current_user_id,
-            name=data['name'].strip(),
-            role=data.get('role', '').strip() or None,
-            company=data.get('company', '').strip() or None,
-            department=data.get('department', '').strip() or None,
-            work_style=data.get('work_style', '').strip() or None,
-            email=data.get('email', '').strip() or None,
-            phone=data.get('phone', '').strip() or None,
-            birthday=data.get('birthday', '').strip() or None,
-            personal_notes=data.get('personal_notes', '').strip() or None,
+            name=clean_optional(data.get('name')),
+            role=clean_optional(data.get('role')),
+            company=clean_optional(data.get('company')),
+            department=clean_optional(data.get('department')),
+            work_style=clean_optional(data.get('work_style')),
+            email=clean_optional(data.get('email')),
+            phone=clean_optional(data.get('phone')),
+            birthday=clean_optional(data.get('birthday')),
+            personal_notes=clean_optional(data.get('personal_notes')),
             sentiment=sentiment,
             influence=influence,
             interest=interest
