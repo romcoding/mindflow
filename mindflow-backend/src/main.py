@@ -296,6 +296,29 @@ try:
             logger.warning(f"Could not add OAuth columns automatically: {str(migration_error)[:200]}")
             logger.info("You may need to run add_oauth_columns.py manually")
         
+        # Try to add missing task columns if they don't exist
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if 'task' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('task')]
+                required_task_columns = ['board_column', 'board_position', 'status']
+                missing_task_columns = [col for col in required_task_columns if col not in columns]
+                
+                if missing_task_columns:
+                    logger.info(f"Adding missing Task columns: {missing_task_columns}")
+                    with db.engine.connect() as conn:
+                        if 'board_column' not in columns:
+                            conn.execute(text('ALTER TABLE task ADD COLUMN board_column VARCHAR(50) DEFAULT \'todo\''))
+                        if 'board_position' not in columns:
+                            conn.execute(text('ALTER TABLE task ADD COLUMN board_position INTEGER DEFAULT 0'))
+                        if 'status' not in columns:
+                            conn.execute(text('ALTER TABLE task ADD COLUMN status VARCHAR(50) DEFAULT \'todo\''))
+                        conn.commit()
+                    logger.info("Task columns added successfully")
+        except Exception as migration_error:
+            logger.warning(f"Could not add Task columns automatically: {str(migration_error)[:200]}")
+        
         # Try to add missing stakeholder columns if they don't exist
         try:
             from sqlalchemy import inspect, text

@@ -14,6 +14,11 @@ class Task(db.Model):
     
     # Optional: Link to stakeholder
     stakeholder_id = db.Column(db.Integer, db.ForeignKey('stakeholder.id'), nullable=True)
+    
+    # Kanban board positioning (for drag-and-drop)
+    board_column = db.Column(db.String(50), default='todo')  # todo, in_progress, review, done
+    board_position = db.Column(db.Integer, default=0)  # Position within column
+    status = db.Column(db.String(50), default='todo')  # todo, in_progress, waiting, done
 
     def __repr__(self):
         return f'<Task {self.title}>'
@@ -29,5 +34,8 @@ class Task(db.Model):
             'completed': self.completed,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'stakeholder_id': self.stakeholder_id
+            'stakeholder_id': self.stakeholder_id,
+            'board_column': getattr(self, 'board_column', 'todo'),
+            'board_position': getattr(self, 'board_position', 0),
+            'status': getattr(self, 'status', 'todo')
         }
