@@ -78,11 +78,13 @@ Respond with ONLY one word: "task", "stakeholder", or "note"
         # If it's a stakeholder, extract detailed information
         if content_type == 'stakeholder':
             extraction_prompt = f"""Extract structured information from the following text about a person/contact.
+Pay special attention to patterns like "Name, Company Role" or "Name at Company" or "Name - Role at Company".
+
 Return a JSON object with the following fields (use null for missing information):
-- name: Full name of the person
-- company: Company or organization they work for
-- role: Job title or role (e.g., "CEO", "Manager", "Head of Product")
-- job_title: Specific job title if mentioned
+- name: Full name of the person (first and last name, including special characters)
+- company: Company or organization they work for (extract company names even if abbreviated)
+- role: Job title or role (e.g., "CEO", "Manager", "Head of Product", "ML Engineer", "Software Engineer")
+- job_title: Specific job title if mentioned (same as role if role is a full job title)
 - department: Department they work in
 - email: Email address if mentioned
 - phone: Phone number if mentioned
@@ -91,6 +93,14 @@ Return a JSON object with the following fields (use null for missing information
 - location: Location/city if mentioned
 - linkedin_url: LinkedIn URL if mentioned
 - other_info: Any other relevant information
+
+IMPORTANT: 
+- If text is in format "Name, Company Role" (e.g., "Christopher Hörnle, Vector8 ML Engineer"), extract:
+  * name: "Christopher Hörnle"
+  * company: "Vector8"
+  * role/job_title: "ML Engineer"
+- If text is in format "Name at Company" or "Name - Role at Company", extract accordingly
+- Always try to identify company names and job titles even if they're combined
 
 Text: "{text}"
 

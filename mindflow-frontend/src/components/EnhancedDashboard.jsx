@@ -452,30 +452,53 @@ const EnhancedDashboard = () => {
     };
 
     if (isStakeholder || extractedNames.length > 0) {
-      // Extract role (e.g., "CEO", "Manager", "Head of Product")
-      const rolePatterns = [
-        /\b(ceo|cto|cfo|coo|president|director|manager|head|lead|senior|junior|executive|vp|vice president)\b/i,
-        /\b(head|lead|chief)\s+of\s+([a-z]+)/i,
-        /\b([a-z]+)\s+(manager|director|lead|head)\b/i
-      ];
-      for (const pattern of rolePatterns) {
-        const match = text.match(pattern);
-        if (match) {
-          stakeholderInfo.role = match[0];
-          break;
+      // First, try to extract from pattern "Name, Company Role" or "Name - Role at Company"
+      const commaPattern = text.match(/^([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*),\s*([A-Z][A-Za-z0-9]+)\s+(.+)$/);
+      if (commaPattern) {
+        stakeholderInfo.name = commaPattern[1];
+        stakeholderInfo.company = commaPattern[2];
+        stakeholderInfo.role = commaPattern[3].trim();
+        stakeholderInfo.job_title = commaPattern[3].trim();
+      } else {
+        // Try pattern "Name at Company" or "Name - Role"
+        const atPattern = text.match(/^([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*)\s+at\s+([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)/i);
+        if (atPattern) {
+          stakeholderInfo.name = atPattern[1];
+          stakeholderInfo.company = atPattern[2];
+        }
+      }
+      
+      // Extract role (e.g., "CEO", "Manager", "Head of Product", "ML Engineer")
+      if (!stakeholderInfo.role) {
+        const rolePatterns = [
+          /\b(ceo|cto|cfo|coo|president|director|manager|head|lead|senior|junior|executive|vp|vice president)\b/i,
+          /\b(head|lead|chief)\s+of\s+([a-z]+)/i,
+          /\b([a-z]+)\s+(manager|director|lead|head)\b/i,
+          /\b([A-Z]{2,}\s+[A-Z][a-z]+|[A-Z][a-z]+\s+Engineer|[A-Z][a-z]+\s+Developer|[A-Z][a-z]+\s+Manager)\b/ // ML Engineer, Software Engineer, etc.
+        ];
+        for (const pattern of rolePatterns) {
+          const match = text.match(pattern);
+          if (match) {
+            stakeholderInfo.role = match[0];
+            stakeholderInfo.job_title = match[0];
+            break;
+          }
         }
       }
 
       // Extract company name (capitalized words that might be company names)
-      const companyPatterns = [
-        /\b(works?|at|from|company|corp|inc|llc|ltd)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-        /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(inc|llc|ltd|corp|company)/i
-      ];
-      for (const pattern of companyPatterns) {
-        const match = text.match(pattern);
-        if (match && match[2]) {
-          stakeholderInfo.company = match[2];
-          break;
+      if (!stakeholderInfo.company) {
+        const companyPatterns = [
+          /\b(works?|at|from|company|corp|inc|llc|ltd)\s+([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)/i,
+          /\b([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)\s+(inc|llc|ltd|corp|company)/i,
+          /,\s*([A-Z][A-Za-z0-9]+)\s+[A-Z]/ // Pattern: "Name, Company Role"
+        ];
+        for (const pattern of companyPatterns) {
+          const match = text.match(pattern);
+          if (match && (match[2] || match[1])) {
+            stakeholderInfo.company = match[2] || match[1];
+            break;
+          }
         }
       }
 
@@ -625,21 +648,36 @@ const EnhancedDashboard = () => {
           }
         }
         
-        // If still no name, try to extract from text (first capitalized words)
+        // If still no name, try to extract from text patterns
         if (!name || name.trim() === '' || name === 'New Contact') {
-          const nameMatches = quickAddText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/);
-          if (nameMatches && nameMatches[0]) {
-            name = nameMatches[0];
+          // Try pattern: "Name, Company Role" or "Name - Role at Company"
+          const commaPattern = quickAddText.match(/^([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*),/);
+          if (commaPattern && commaPattern[1]) {
+            name = commaPattern[1];
           } else {
-            // Last resort: use first few words of text
-            const words = quickAddText.trim().split(/\s+/);
-            name = words.slice(0, 2).join(' ') || 'New Contact';
+            // Try first capitalized words (up to 2-3 words for full name)
+            const nameMatches = quickAddText.match(/\b[A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+){0,2}\b/);
+            if (nameMatches && nameMatches[0]) {
+              name = nameMatches[0];
+            } else {
+              // Last resort: use first few words of text
+              const words = quickAddText.trim().split(/\s+/);
+              name = words.slice(0, 2).join(' ') || 'New Contact';
+            }
           }
         }
         
         // Ensure name is not empty
         if (!name || name.trim() === '') {
           name = 'New Contact';
+        }
+        
+        // If AI didn't extract company/role but we have them in local parsing, use those
+        if (!stakeholderInfo.company && analysis.stakeholderInfo?.company) {
+          stakeholderInfo.company = analysis.stakeholderInfo.company;
+        }
+        if (!stakeholderInfo.role && !stakeholderInfo.job_title && analysis.stakeholderInfo?.role) {
+          stakeholderInfo.role = analysis.stakeholderInfo.role;
         }
         
         // Combine personal_notes with other_info if available

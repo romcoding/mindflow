@@ -213,4 +213,8 @@ export const aiAPI = {
   parseContent: (text) => api.post('/ai/parse-content', { text }),
 };
 
+export const linkedinAPI = {
+  fetchProfile: (data) => api.post('/linkedin/fetch-profile', data),
+};
+
 export default api;

@@ -34,8 +34,10 @@ import {
   Save,
   X,
   Plus,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
+import { linkedinAPI } from '@/lib/api';
 
 const StakeholderDetailModal = ({ 
   isOpen, 
@@ -110,6 +112,7 @@ const StakeholderDetailModal = ({
   const [newTag, setNewTag] = useState('');
   const [newSpecialization, setNewSpecialization] = useState('');
   const [newProject, setNewProject] = useState('');
+  const [isFetchingLinkedIn, setIsFetchingLinkedIn] = useState(false);
 
   // Initialize form data when stakeholder changes
   useEffect(() => {
@@ -223,6 +226,54 @@ const StakeholderDetailModal = ({
       ...prev,
       current_projects: prev.current_projects.filter(project => project !== projectToRemove)
     }));
+  };
+
+  const handleFetchLinkedIn = async () => {
+    if (!formData.linkedin_url && !formData.name) {
+      alert('Please provide either a LinkedIn URL or a name to fetch profile data.');
+      return;
+    }
+
+    setIsFetchingLinkedIn(true);
+    try {
+      const response = await linkedinAPI.fetchProfile({
+        linkedin_url: formData.linkedin_url || null,
+        name: formData.name || null,
+        company: formData.company || null
+      });
+
+      if (response.data?.success && response.data?.stakeholder_info) {
+        const linkedinData = response.data.stakeholder_info;
+        
+        // Update form data with LinkedIn information (only fill empty fields)
+        setFormData(prev => ({
+          ...prev,
+          name: prev.name || linkedinData.name || prev.name,
+          company: prev.company || linkedinData.company || prev.company,
+          role: prev.role || linkedinData.role || prev.role,
+          job_title: prev.job_title || linkedinData.job_title || prev.job_title,
+          location: prev.location || linkedinData.location || prev.location,
+          linkedin_url: prev.linkedin_url || linkedinData.linkedin_url || prev.linkedin_url,
+          email: prev.email || linkedinData.email || prev.email,
+          phone: prev.phone || linkedinData.phone || prev.phone,
+          personal_notes: prev.personal_notes 
+            ? `${prev.personal_notes}\n\nLinkedIn: ${linkedinData.personal_notes || ''}`.trim()
+            : linkedinData.personal_notes || prev.personal_notes,
+          education: prev.education || linkedinData.education || prev.education,
+        }));
+        
+        alert('LinkedIn profile data fetched and populated successfully!');
+      } else {
+        const errorMsg = response.data?.error || response.data?.message || 'Failed to fetch LinkedIn profile';
+        alert(errorMsg);
+      }
+    } catch (error) {
+      console.error('Failed to fetch LinkedIn profile:', error);
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to fetch LinkedIn profile';
+      alert(errorMsg);
+    } finally {
+      setIsFetchingLinkedIn(false);
+    }
   };
 
   const handleSave = () => {
@@ -689,15 +740,32 @@ const StakeholderDetailModal = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="linkedin_url">LinkedIn Profile</Label>
-                    <div className="relative">
-                      <Linkedin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="linkedin_url"
-                        value={formData.linkedin_url}
-                        onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
-                        placeholder="https://linkedin.com/in/username"
-                        className="pl-10"
-                      />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Linkedin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="linkedin_url"
+                          value={formData.linkedin_url}
+                          onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
+                          placeholder="https://linkedin.com/in/username"
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleFetchLinkedIn}
+                        disabled={isFetchingLinkedIn || (!formData.linkedin_url && !formData.name)}
+                        title="Fetch LinkedIn profile data"
+                        className="shrink-0"
+                      >
+                        {isFetchingLinkedIn ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Linkedin className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                   <div>
