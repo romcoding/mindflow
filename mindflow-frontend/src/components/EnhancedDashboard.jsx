@@ -1434,24 +1434,25 @@ const EnhancedDashboard = () => {
               <Textarea
                 placeholder="What's on your mind? Speak or type your thoughts..."
                 value={quickAddText}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const text = e.target.value;
                   setQuickAddText(text);
                   if (text && text.length > 10) {
-                    // Use AI parsing for better results
-                    try {
-                      const response = await aiAPI.parseContent(text);
-                      if (response.data.success) {
-                        setAnalysisResult(response.data);
-                      } else {
-                        // Fallback to local parsing
+                    // Use AI parsing for better results (async, but don't block)
+                    aiAPI.parseContent(text)
+                      .then((response) => {
+                        if (response.data.success) {
+                          setAnalysisResult(response.data);
+                        } else {
+                          // Fallback to local parsing
+                          setAnalysisResult(analyzeContent(text));
+                        }
+                      })
+                      .catch((error) => {
+                        console.log('AI parsing not available, using local parsing:', error);
+                        // Fallback to local parsing if AI is not available
                         setAnalysisResult(analyzeContent(text));
-                      }
-                    } catch (error) {
-                      console.log('AI parsing not available, using local parsing:', error);
-                      // Fallback to local parsing if AI is not available
-                      setAnalysisResult(analyzeContent(text));
-                    }
+                      });
                   } else if (text) {
                     // For short text, use local parsing
                     setAnalysisResult(analyzeContent(text));
