@@ -23,11 +23,33 @@ def get_openai_client():
     
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        logger.info("OpenAI client initialized")
+        # Only pass api_key explicitly to avoid any proxy/environment variable conflicts
+        # Strip any whitespace from the API key
+        api_key = OPENAI_API_KEY.strip() if OPENAI_API_KEY else None
+        if not api_key:
+            logger.warning("OPENAI_API_KEY is empty after stripping")
+            return None
+        
+        # Initialize client with only the api_key parameter
+        # This avoids issues with proxies or other environment variables
+        client = OpenAI(api_key=api_key)
+        logger.info("✅ OpenAI client initialized successfully")
         return client
+    except TypeError as e:
+        # Handle specific TypeError about unexpected arguments
+        logger.error(f"Failed to initialize OpenAI client (TypeError): {str(e)}")
+        logger.error("This might be due to an incompatible OpenAI library version or environment variable conflicts")
+        # Try to re-import and check version
+        try:
+            import openai
+            logger.error(f"OpenAI library version: {openai.__version__}")
+        except:
+            pass
+        return None
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 @ai_parser_bp.route('/ai/parse-content', methods=['POST'])
@@ -35,12 +57,6 @@ def get_openai_client():
 def parse_content():
     """Use AI to parse and structure content from text input"""
     try:
-        client = get_openai_client()
-        if not client:
-            return jsonify({
-                'success': False,
-                'error': 'AI parsing not available. OPENAI_API_KEY not configured.'
-            }), 503
         data = request.get_json()
         text = data.get('text', '').strip()
         
@@ -49,6 +65,18 @@ def parse_content():
                 'success': False,
                 'error': 'Text input is required'
             }), 400
+        
+        logger.info(f"📝 AI parsing request for text: {text[:100]}...")
+        
+        client = get_openai_client()
+        if not client:
+            logger.warning("❌ OpenAI client not available - returning error")
+            return jsonify({
+                'success': False,
+                'error': 'AI parsing not available. OPENAI_API_KEY not configured or client initialization failed.'
+            }), 503
+        
+        logger.info("✅ OpenAI client available, proceeding with AI parsing")
         
         # Determine content type first
         type_prompt = f"""Analyze the following text and determine if it's about:
@@ -63,7 +91,8 @@ Text: "{text}"
 Respond with ONLY one word: "task", "stakeholder", or "note"
 """
         
-        type_response = get_openai_client().chat.completions.create(
+        logger.info("🔍 Step 1: Classifying content type...")
+        type_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a content classifier. Respond with only one word."},
@@ -74,6 +103,7 @@ Respond with ONLY one word: "task", "stakeholder", or "note"
         )
         
         content_type = type_response.choices[0].message.content.strip().lower()
+        logger.info(f"✅ Content classified as: {content_type}")
         
         # If it's a stakeholder, extract detailed information
         if content_type == 'stakeholder':
@@ -107,7 +137,8 @@ Text: "{text}"
 Return ONLY valid JSON, no additional text or explanation.
 """
             
-            extraction_response = get_openai_client().chat.completions.create(
+            logger.info("🔍 Step 2: Extracting stakeholder information...")
+            extraction_response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a data extraction assistant. Extract information and return ONLY valid JSON."},
@@ -119,6 +150,7 @@ Return ONLY valid JSON, no additional text or explanation.
             
             try:
                 extracted_data = json.loads(extraction_response.choices[0].message.content)
+                logger.info(f"📊 Extracted data: {json.dumps(extracted_data, indent=2)}")
                 
                 # Clean and validate the extracted data
                 stakeholder_info = {
@@ -135,6 +167,8 @@ Return ONLY valid JSON, no additional text or explanation.
                     'personal_notes': extracted_data.get('personal_notes') or text,  # Fallback to original text
                     'other_info': extracted_data.get('other_info') or None
                 }
+                
+                logger.info(f"✅ Final stakeholder_info: {json.dumps(stakeholder_info, indent=2)}")
                 
                 return jsonify({
                     'success': True,
@@ -170,7 +204,8 @@ Text: "{text}"
 Return ONLY valid JSON, no additional text.
 """
             
-            task_response = get_openai_client().chat.completions.create(
+            logger.info("🔍 Extracting task information...")
+            task_response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a task extraction assistant. Return ONLY valid JSON."},

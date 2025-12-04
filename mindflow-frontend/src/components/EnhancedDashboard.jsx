@@ -581,15 +581,25 @@ const EnhancedDashboard = () => {
     if (!analysis || type) {
       try {
         // Try AI parsing first - always re-parse when type is forced to get correct data
+        console.log('🤖 Attempting AI parsing for:', quickAddText);
         const aiResponse = await aiAPI.parseContent(quickAddText);
+        console.log('🤖 AI Response:', aiResponse?.data);
+        
         if (aiResponse?.data?.success) {
           analysis = aiResponse.data;
+          console.log('✅ AI parsing succeeded:', {
+            type: analysis.type,
+            stakeholder_info: analysis.stakeholder_info,
+            task_info: analysis.task_info
+          });
         } else {
+          console.warn('⚠️ AI parsing returned success=false, falling back to local parsing');
           // Fallback to local parsing
           analysis = analyzeContent(quickAddText);
         }
       } catch (error) {
-        console.log('AI parsing not available, using local parsing:', error);
+        console.error('❌ AI parsing failed, using local parsing:', error);
+        console.error('Error details:', error.response?.data || error.message);
         // Fallback to local parsing
         analysis = analyzeContent(quickAddText);
       }
@@ -600,10 +610,12 @@ const EnhancedDashboard = () => {
         
         // If forcing stakeholder type but AI didn't extract stakeholder info, try to extract it
         if (type === 'stakeholder' && !analysis.stakeholder_info && !analysis.stakeholderInfo) {
+          console.log('🔍 AI didn\'t extract stakeholder info, trying local parsing');
           // Use local parsing to extract stakeholder info
           const localAnalysis = analyzeContent(quickAddText);
           if (localAnalysis.stakeholderInfo) {
             analysis.stakeholderInfo = localAnalysis.stakeholderInfo;
+            console.log('✅ Local parsing extracted:', localAnalysis.stakeholderInfo);
           }
         }
       }
@@ -680,6 +692,18 @@ const EnhancedDashboard = () => {
           stakeholderInfo.role = analysis.stakeholderInfo.role;
         }
         
+        // Log what we extracted for debugging
+        console.log('📊 AI Extracted Stakeholder Info:', {
+          name: stakeholderInfo.name,
+          company: stakeholderInfo.company,
+          role: stakeholderInfo.role,
+          job_title: stakeholderInfo.job_title,
+          email: stakeholderInfo.email,
+          phone: stakeholderInfo.phone,
+          location: stakeholderInfo.location,
+          fullInfo: stakeholderInfo
+        });
+        
         // Combine personal_notes with other_info if available
         let personalNotes = stakeholderInfo.personal_notes || quickAddText;
         if (stakeholderInfo.other_info && stakeholderInfo.other_info !== personalNotes) {
@@ -688,13 +712,13 @@ const EnhancedDashboard = () => {
         
         const stakeholderData = {
           name: name.trim(),
-          role: stakeholderInfo.role || null,
+          role: stakeholderInfo.role || stakeholderInfo.job_title || null,
           company: stakeholderInfo.company || null,
           email: stakeholderInfo.email || null,
           phone: stakeholderInfo.phone || null,
           birthday: stakeholderInfo.birthday || null,
           department: stakeholderInfo.department || null,
-          job_title: stakeholderInfo.job_title || null,
+          job_title: stakeholderInfo.job_title || stakeholderInfo.role || null,
           location: stakeholderInfo.location || null,
           linkedin_url: stakeholderInfo.linkedin_url || null,
           personal_notes: personalNotes.trim() || null,
@@ -703,7 +727,7 @@ const EnhancedDashboard = () => {
           interest: 5
         };
         
-        console.log('Creating stakeholder with extracted info:', stakeholderData);
+        console.log('✅ Creating stakeholder with final data:', stakeholderData);
         const response = await stakeholdersAPI.createStakeholder(stakeholderData);
         console.log('Stakeholder creation response:', response.data);
         alert('Contact created successfully!');
