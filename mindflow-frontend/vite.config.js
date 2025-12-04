@@ -15,7 +15,15 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'd3-vendor': ['d3'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tooltip'],
+        },
+      },
       onwarn(warning, warn) {
         // Suppress certain warnings
         if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
