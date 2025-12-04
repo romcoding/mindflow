@@ -3,31 +3,44 @@ from flask_jwt_extended import jwt_required
 import os
 import json
 import logging
-from openai import OpenAI
 
 ai_parser_bp = Blueprint('ai_parser', __name__)
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
+# Lazy initialization of OpenAI client
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 client = None
-if OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    logger.info("OpenAI client initialized")
-else:
-    logger.warning("OPENAI_API_KEY not set - AI parsing will not be available")
+
+def get_openai_client():
+    """Lazy initialization of OpenAI client to avoid import-time errors"""
+    global client
+    if client is not None:
+        return client
+    
+    if not OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY not set - AI parsing will not be available")
+        return None
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        logger.info("OpenAI client initialized")
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+        return None
 
 @ai_parser_bp.route('/ai/parse-content', methods=['POST'])
 @jwt_required()
 def parse_content():
     """Use AI to parse and structure content from text input"""
-    if not client:
-        return jsonify({
-            'success': False,
-            'error': 'AI parsing not available. OPENAI_API_KEY not configured.'
-        }), 503
-    
     try:
+        client = get_openai_client()
+        if not client:
+            return jsonify({
+                'success': False,
+                'error': 'AI parsing not available. OPENAI_API_KEY not configured.'
+            }), 503
         data = request.get_json()
         text = data.get('text', '').strip()
         
@@ -48,7 +61,7 @@ Text: "{text}"
 Respond with ONLY one word: "task", "stakeholder", or "note"
 """
         
-        type_response = client.chat.completions.create(
+        type_response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a content classifier. Respond with only one word."},
@@ -82,7 +95,7 @@ Text: "{text}"
 Return ONLY valid JSON, no additional text or explanation.
 """
             
-            extraction_response = client.chat.completions.create(
+            extraction_response = get_openai_client().chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a data extraction assistant. Extract information and return ONLY valid JSON."},
@@ -145,7 +158,7 @@ Text: "{text}"
 Return ONLY valid JSON, no additional text.
 """
             
-            task_response = client.chat.completions.create(
+            task_response = get_openai_client().chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a task extraction assistant. Return ONLY valid JSON."},
