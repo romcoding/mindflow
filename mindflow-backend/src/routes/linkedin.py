@@ -264,13 +264,22 @@ def fetch_linkedin_profile():
             }), 400
         
         # Check if OpenAI is available
-        client = get_openai_client()
-        if not client:
-            logger.error("❌ OpenAI client not available")
+        OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+        if not OPENAI_API_KEY:
+            logger.error("❌ OPENAI_API_KEY environment variable not set")
             return jsonify({
                 'success': False,
                 'error': 'OpenAI API not configured',
-                'message': 'To enable LinkedIn profile fetching, configure OPENAI_API_KEY environment variable.'
+                'message': 'To enable LinkedIn profile fetching, please set the OPENAI_API_KEY environment variable in your Render dashboard.'
+            }), 503
+        
+        client = get_openai_client()
+        if not client:
+            logger.error("❌ OpenAI client initialization failed")
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API client initialization failed',
+                'message': 'OPENAI_API_KEY is set but client initialization failed. Please check your API key and try again.'
             }), 503
         
         logger.info("✅ OpenAI client available, proceeding with LinkedIn search")

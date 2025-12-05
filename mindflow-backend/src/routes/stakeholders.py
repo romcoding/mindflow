@@ -6,6 +6,19 @@ from datetime import datetime
 
 stakeholders_bp = Blueprint('stakeholders', __name__)
 
+def clean_optional(value):
+    """
+    Safely strip a value that may be None or non-string.
+    Returns None if the resulting string is empty.
+    """
+    if value is None:
+        return None
+    try:
+        value_str = str(value).strip()
+    except Exception:
+        return None
+    return value_str or None
+
 @stakeholders_bp.route('/stakeholders', methods=['GET'])
 @jwt_required()
 def get_stakeholders():
@@ -43,20 +56,6 @@ def create_stakeholder():
         # get_jwt_identity() returns a string, convert to int for database queries
         current_user_id = int(get_jwt_identity())
         data = request.get_json()
-        
-        # Helper to safely strip optional string fields that might be None
-        def clean_optional(value):
-            """
-            Safely strip a value that may be None or non-string.
-            Returns None if the resulting string is empty.
-            """
-            if value is None:
-                return None
-            try:
-                value_str = str(value).strip()
-            except Exception:
-                return None
-            return value_str or None
         
         # Validate required fields
         if not data.get('name'):
@@ -207,6 +206,123 @@ def update_stakeholder(stakeholder_id):
             tags = data['tags']
             if isinstance(tags, list):
                 stakeholder.set_tags_list(tags)
+        
+        # Update additional fields that might be missing
+        if 'job_title' in data:
+            stakeholder.job_title = clean_optional(data.get('job_title'))
+        
+        if 'location' in data:
+            stakeholder.location = clean_optional(data.get('location'))
+        
+        if 'linkedin_url' in data:
+            stakeholder.linkedin_url = clean_optional(data.get('linkedin_url'))
+        
+        if 'twitter_handle' in data:
+            stakeholder.twitter_handle = clean_optional(data.get('twitter_handle'))
+        
+        if 'education' in data:
+            stakeholder.education = clean_optional(data.get('education'))
+        
+        if 'career_history' in data:
+            stakeholder.career_history = clean_optional(data.get('career_history'))
+        
+        if 'hobbies' in data:
+            stakeholder.hobbies = clean_optional(data.get('hobbies'))
+        
+        if 'family_info' in data:
+            stakeholder.family_info = clean_optional(data.get('family_info'))
+        
+        if 'specializations' in data:
+            specializations = data.get('specializations')
+            if isinstance(specializations, list):
+                stakeholder.set_specializations_list(specializations)
+            elif isinstance(specializations, str):
+                stakeholder.specializations = clean_optional(specializations)
+        
+        if 'current_projects' in data:
+            projects = data.get('current_projects')
+            if isinstance(projects, list):
+                stakeholder.set_current_projects_list(projects)
+            elif isinstance(projects, str):
+                stakeholder.current_projects = clean_optional(projects)
+        
+        if 'trust_level' in data:
+            try:
+                trust_level = int(data['trust_level'])
+                if 1 <= trust_level <= 10:
+                    stakeholder.trust_level = trust_level
+            except (ValueError, TypeError):
+                pass  # Ignore invalid trust_level values
+        
+        if 'strategic_value' in data:
+            valid_values = ['low', 'medium', 'high', 'critical']
+            if data['strategic_value'] in valid_values:
+                stakeholder.strategic_value = data['strategic_value']
+        
+        if 'timezone' in data:
+            stakeholder.timezone = clean_optional(data.get('timezone'))
+        
+        if 'preferred_language' in data:
+            stakeholder.preferred_language = clean_optional(data.get('preferred_language')) or 'English'
+        
+        if 'cultural_background' in data:
+            stakeholder.cultural_background = clean_optional(data.get('cultural_background'))
+        
+        if 'preferred_communication_method' in data:
+            stakeholder.preferred_communication_method = clean_optional(data.get('preferred_communication_method')) or 'email'
+        
+        if 'communication_frequency' in data:
+            stakeholder.communication_frequency = clean_optional(data.get('communication_frequency')) or 'weekly'
+        
+        if 'best_contact_time' in data:
+            stakeholder.best_contact_time = clean_optional(data.get('best_contact_time'))
+        
+        if 'communication_style' in data:
+            stakeholder.communication_style = clean_optional(data.get('communication_style'))
+        
+        if 'seniority_level' in data:
+            stakeholder.seniority_level = clean_optional(data.get('seniority_level'))
+        
+        if 'years_experience' in data:
+            try:
+                years = int(data['years_experience']) if data['years_experience'] else None
+                stakeholder.years_experience = years
+            except (ValueError, TypeError):
+                pass
+        
+        if 'decision_making_authority' in data:
+            valid_values = ['low', 'medium', 'high']
+            if data['decision_making_authority'] in valid_values:
+                stakeholder.decision_making_authority = data['decision_making_authority']
+        
+        if 'budget_authority' in data:
+            valid_values = ['none', 'limited', 'significant', 'full']
+            if data['budget_authority'] in valid_values:
+                stakeholder.budget_authority = data['budget_authority']
+        
+        if 'availability_status' in data:
+            valid_values = ['available', 'busy', 'unavailable']
+            if data['availability_status'] in valid_values:
+                stakeholder.availability_status = data['availability_status']
+        
+        if 'risk_level' in data:
+            valid_values = ['low', 'medium', 'high']
+            if data['risk_level'] in valid_values:
+                stakeholder.risk_level = data['risk_level']
+        
+        if 'opportunity_potential' in data:
+            valid_values = ['low', 'medium', 'high']
+            if data['opportunity_potential'] in valid_values:
+                stakeholder.opportunity_potential = data['opportunity_potential']
+        
+        if 'collaboration_history' in data:
+            stakeholder.collaboration_history = clean_optional(data.get('collaboration_history'))
+        
+        if 'conflict_resolution_style' in data:
+            stakeholder.conflict_resolution_style = clean_optional(data.get('conflict_resolution_style'))
+        
+        if 'other_social_links' in data:
+            stakeholder.other_social_links = clean_optional(data.get('other_social_links'))
         
         # Update last contact if this is a contact update
         if any(field in data for field in ['email', 'phone']):
