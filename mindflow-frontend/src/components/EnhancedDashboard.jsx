@@ -783,6 +783,10 @@ const EnhancedDashboard = () => {
       // Stop recording if already recording
       if (window.currentRecognition) {
         window.currentRecognition.stop();
+        if (window.recognitionTimeout) {
+          clearTimeout(window.recognitionTimeout);
+          window.recognitionTimeout = null;
+        }
       }
       return;
     }
@@ -790,19 +794,54 @@ const EnhancedDashboard = () => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      
+      // Enable continuous mode so it doesn't stop on short pauses
+      recognition.continuous = true;
       recognition.interimResults = true; // Show interim results for better UX
-      recognition.lang = 'en-US';
+      
+      // Use a more comprehensive language setting for better name/company recognition
+      // Try to detect user's language or default to English with better settings
+      const userLang = navigator.language || 'en-US';
+      recognition.lang = userLang;
+      
+      // Improve recognition accuracy for proper nouns (names, companies)
+      // Some browsers support maxAlternatives for better results
+      if ('maxAlternatives' in recognition) {
+        recognition.maxAlternatives = 3;
+      }
 
       // Store recognition instance globally so we can stop it
       window.currentRecognition = recognition;
+      
+      // Track last speech time for pause detection
+      let lastSpeechTime = Date.now();
+      const PAUSE_TIMEOUT = 4000; // 4 seconds of silence before stopping
+      
+      // Function to reset the pause timeout
+      const resetPauseTimeout = () => {
+        if (window.recognitionTimeout) {
+          clearTimeout(window.recognitionTimeout);
+        }
+        window.recognitionTimeout = setTimeout(() => {
+          if (window.currentRecognition && isRecording) {
+            console.log('🎤 Pause detected, stopping recognition after timeout');
+            window.currentRecognition.stop();
+          }
+        }, PAUSE_TIMEOUT);
+      };
 
       recognition.onstart = () => {
         setIsRecording(true);
-        console.log('🎤 Voice recording started');
+        console.log('🎤 Voice recording started (continuous mode)');
+        lastSpeechTime = Date.now();
+        resetPauseTimeout();
       };
 
       recognition.onresult = async (event) => {
+        // Reset pause timeout on any speech activity
+        lastSpeechTime = Date.now();
+        resetPauseTimeout();
+        
         let interimTranscript = '';
         let finalTranscript = '';
 
@@ -839,19 +878,30 @@ const EnhancedDashboard = () => {
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
+        
+        // Don't stop on 'no-speech' errors in continuous mode - it's normal
+        if (event.error === 'no-speech') {
+          console.log('No speech detected, continuing to listen...');
+          return; // Continue listening
+        }
+        
         setIsRecording(false);
+        if (window.recognitionTimeout) {
+          clearTimeout(window.recognitionTimeout);
+          window.recognitionTimeout = null;
+        }
         
         let errorMessage = 'Speech recognition error. ';
         switch(event.error) {
-          case 'no-speech':
-            errorMessage = 'No speech detected. Please try again.';
-            break;
           case 'audio-capture':
             errorMessage = 'No microphone found. Please check your microphone.';
             break;
           case 'not-allowed':
             errorMessage = 'Microphone permission denied. Please allow microphone access.';
             break;
+          case 'aborted':
+            // User stopped manually, don't show error
+            return;
           default:
             errorMessage = `Error: ${event.error}`;
         }
@@ -859,6 +909,26 @@ const EnhancedDashboard = () => {
       };
 
       recognition.onend = () => {
+        if (window.recognitionTimeout) {
+          clearTimeout(window.recognitionTimeout);
+          window.recognitionTimeout = null;
+        }
+        
+        // Only stop if user didn't manually stop it
+        if (isRecording && window.currentRecognition) {
+          // Auto-restart if we're still in recording mode (handles brief pauses)
+          const timeSinceLastSpeech = Date.now() - lastSpeechTime;
+          if (timeSinceLastSpeech < PAUSE_TIMEOUT) {
+            console.log('🎤 Restarting recognition after brief pause');
+            try {
+              recognition.start();
+              return; // Don't set isRecording to false
+            } catch (error) {
+              console.log('Could not restart recognition:', error);
+            }
+          }
+        }
+        
         setIsRecording(false);
         window.currentRecognition = null;
         console.log('🎤 Voice recording ended');
