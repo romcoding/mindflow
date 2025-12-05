@@ -139,12 +139,19 @@ Respond with ONLY one word: "task", "stakeholder", or "note"
         # If it's a stakeholder, extract detailed information
         if content_type == 'stakeholder':
             extraction_prompt = f"""Extract structured information from the following text about a person/contact.
+This text may come from voice dictation, so be forgiving with spelling and capitalization.
+
 Pay special attention to patterns like "Name, Company Role" or "Name at Company" or "Name - Role at Company".
 
 Return a JSON object with the following fields (use null for missing information):
 - name: Full name of the person (first and last name, including special characters)
-- company: Company or organization they work for (extract company names even if abbreviated)
+  * For voice input, correct common mispronunciations (e.g., "Karin" not "Karen", "Christopher" not "Kristopher")
+  * Capitalize proper names correctly even if voice recognition didn't
+- company: Company or organization they work for (extract company names even if abbreviated or misspelled)
+  * For voice input, try to identify company names even if spelled phonetically
+  * Common patterns: "Vector8", "Vector Eight", "Vector Ate" all mean the same company
 - role: Job title or role (e.g., "CEO", "Manager", "Head of Product", "ML Engineer", "Software Engineer")
+  * For voice input, correct common mistakes (e.g., "engineer" not "engineer", "manager" not "manager")
 - job_title: Specific job title if mentioned (same as role if role is a full job title)
 - department: Department they work in
 - email: Email address if mentioned
@@ -162,6 +169,8 @@ IMPORTANT:
   * role/job_title: "ML Engineer"
 - If text is in format "Name at Company" or "Name - Role at Company", extract accordingly
 - Always try to identify company names and job titles even if they're combined
+- For voice-transcribed text, be intelligent about correcting common speech-to-text errors
+- Capitalize names and companies properly even if voice recognition didn't
 
 Text: "{text}"
 
