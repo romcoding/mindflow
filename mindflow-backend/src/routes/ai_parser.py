@@ -133,6 +133,10 @@ Respond with ONLY one word: "task", "stakeholder", or "note"
             max_tokens=10
         )
         
+        # Log OpenAI API usage
+        if hasattr(type_response, 'usage'):
+            logger.info(f"📊 OpenAI API usage (classification) - Tokens: {type_response.usage.total_tokens} (prompt: {type_response.usage.prompt_tokens}, completion: {type_response.usage.completion_tokens})")
+        
         content_type = type_response.choices[0].message.content.strip().lower()
         logger.info(f"✅ Content classified as: {content_type}")
         
@@ -187,6 +191,10 @@ Return ONLY valid JSON, no additional text or explanation.
                 temperature=0.3,
                 response_format={"type": "json_object"}
             )
+            
+            # Log OpenAI API usage
+            if hasattr(extraction_response, 'usage'):
+                logger.info(f"📊 OpenAI API usage (extraction) - Tokens: {extraction_response.usage.total_tokens} (prompt: {extraction_response.usage.prompt_tokens}, completion: {extraction_response.usage.completion_tokens})")
             
             try:
                 extracted_data = json.loads(extraction_response.choices[0].message.content)
