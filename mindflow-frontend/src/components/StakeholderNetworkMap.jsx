@@ -460,24 +460,154 @@ const StakeholderNetworkMap = ({
     return companies.sort();
   };
 
-  const getNetworkStats = () => {
+  // Calculate advanced network metrics
+  const calculateNetworkInsights = () => {
     const totalNodes = stakeholders.length;
-    const totalLinks = relationships.filter(r => r.is_active !== false).length;
+    const activeRelationships = relationships.filter(r => r.is_active !== false);
+    const totalLinks = activeRelationships.length;
+    
+    if (totalNodes === 0) {
+      return {
+        totalNodes: 0,
+        totalLinks: 0,
+        avgInfluence: 0,
+        sentimentCounts: {},
+        insights: []
+      };
+    }
+    
     const avgInfluence = stakeholders.reduce((sum, s) => sum + (s.influence || 5), 0) / totalNodes;
     const sentimentCounts = stakeholders.reduce((acc, s) => {
       acc[s.sentiment || 'neutral'] = (acc[s.sentiment || 'neutral'] || 0) + 1;
       return acc;
     }, {});
 
+    // Calculate degree centrality (number of connections per node)
+    const degreeCentrality = {};
+    stakeholders.forEach(s => {
+      degreeCentrality[s.id] = activeRelationships.filter(
+        r => r.source_stakeholder_id === s.id || r.target_stakeholder_id === s.id
+      ).length;
+    });
+
+    // Find key connectors (high degree centrality)
+    const sortedByDegree = Object.entries(degreeCentrality)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const keyConnectors = sortedByDegree
+      .map(([id, degree]) => {
+        const stakeholder = stakeholders.find(s => s.id === parseInt(id));
+        return stakeholder ? { name: stakeholder.name, degree } : null;
+      })
+      .filter(Boolean);
+
+    // Calculate relationship strength distribution
+    const strongRelationships = activeRelationships.filter(r => (r.relationship_strength || 5) >= 7).length;
+    const mediumRelationships = activeRelationships.filter(r => {
+      const strength = r.relationship_strength || 5;
+      return strength >= 4 && strength < 7;
+    }).length;
+    const weakRelationships = activeRelationships.filter(r => (r.relationship_strength || 5) < 4).length;
+
+    // Find isolated nodes (no connections)
+    const connectedNodeIds = new Set();
+    activeRelationships.forEach(r => {
+      connectedNodeIds.add(r.source_stakeholder_id);
+      connectedNodeIds.add(r.target_stakeholder_id);
+    });
+    const isolatedNodes = stakeholders.filter(s => !connectedNodeIds.has(s.id)).length;
+
+    // Calculate network density
+    const maxPossibleConnections = totalNodes * (totalNodes - 1) / 2;
+    const networkDensity = maxPossibleConnections > 0 
+      ? (totalLinks / maxPossibleConnections) * 100 
+      : 0;
+
+    // Find most connected company
+    const companyConnections = {};
+    activeRelationships.forEach(r => {
+      const source = stakeholders.find(s => s.id === r.source_stakeholder_id);
+      const target = stakeholders.find(s => s.id === r.target_stakeholder_id);
+      if (source?.company) {
+        companyConnections[source.company] = (companyConnections[source.company] || 0) + 1;
+      }
+      if (target?.company) {
+        companyConnections[target.company] = (companyConnections[target.company] || 0) + 1;
+      }
+    });
+    const mostConnectedCompany = Object.entries(companyConnections)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    // Calculate average relationship strength
+    const avgRelationshipStrength = activeRelationships.length > 0
+      ? activeRelationships.reduce((sum, r) => sum + (r.relationship_strength || 5), 0) / activeRelationships.length
+      : 0;
+
+    // Generate insights
+    const insights = [];
+    
+    if (keyConnectors.length > 0) {
+      insights.push({
+        type: 'key_connectors',
+        title: 'Key Connectors',
+        description: `${keyConnectors.map(kc => kc.name).join(', ')} have the most connections in your network`,
+        value: keyConnectors.map(kc => `${kc.name} (${kc.degree})`).join(', ')
+      });
+    }
+
+    if (isolatedNodes > 0) {
+      insights.push({
+        type: 'isolated',
+        title: 'Isolated Stakeholders',
+        description: `${isolatedNodes} stakeholder${isolatedNodes > 1 ? 's' : ''} have no connections yet`,
+        value: `${isolatedNodes}`
+      });
+    }
+
+    if (networkDensity < 20) {
+      insights.push({
+        type: 'low_density',
+        title: 'Network Growth Opportunity',
+        description: 'Your network has low density - consider building more relationships',
+        value: `${networkDensity.toFixed(1)}%`
+      });
+    }
+
+    if (strongRelationships > 0) {
+      insights.push({
+        type: 'strong_relationships',
+        title: 'Strong Relationships',
+        description: `${strongRelationships} relationship${strongRelationships > 1 ? 's' : ''} with high strength (7+)`,
+        value: `${strongRelationships}`
+      });
+    }
+
+    if (mostConnectedCompany) {
+      insights.push({
+        type: 'company_focus',
+        title: 'Most Connected Company',
+        description: `${mostConnectedCompany[0]} has the most connections in your network`,
+        value: `${mostConnectedCompany[0]} (${mostConnectedCompany[1]})`
+      });
+    }
+
     return {
       totalNodes,
       totalLinks,
       avgInfluence: avgInfluence.toFixed(1),
-      sentimentCounts
+      sentimentCounts,
+      networkDensity: networkDensity.toFixed(1),
+      avgRelationshipStrength: avgRelationshipStrength.toFixed(1),
+      strongRelationships,
+      mediumRelationships,
+      weakRelationships,
+      isolatedNodes,
+      keyConnectors,
+      insights
     };
   };
 
-  const stats = getNetworkStats();
+  const stats = calculateNetworkInsights();
 
   return (
     <div className={`stakeholder-network-map ${className}`}>
@@ -491,13 +621,13 @@ const StakeholderNetworkMap = ({
           <div className="flex gap-4 text-sm text-gray-600">
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {stats.totalNodes} nodes
+              {stats?.totalNodes || 0} nodes
             </Badge>
             <Badge variant="outline">
-              {stats.totalLinks} connections
+              {stats?.totalLinks || 0} connections
             </Badge>
             <Badge variant="outline">
-              Avg. Influence: {stats.avgInfluence}
+              Avg. Influence: {stats?.avgInfluence || '0.0'}
             </Badge>
           </div>
         </div>
@@ -780,56 +910,113 @@ const StakeholderNetworkMap = ({
 
       {/* Network insights */}
       {stakeholders.length > 0 && (
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Sentiment Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {Object.entries(stats.sentimentCounts).map(([sentiment, count]) => (
-                  <div key={sentiment} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: getSentimentColor(sentiment) }}
-                      ></div>
-                      <span className="capitalize text-sm">{sentiment}</span>
+        <div className="mt-4 space-y-4">
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Sentiment Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(stats.sentimentCounts).map(([sentiment, count]) => (
+                    <div key={sentiment} className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: getSentimentColor(sentiment) }}
+                        ></div>
+                        <span className="capitalize text-sm">{sentiment}</span>
+                      </div>
+                      <span className="text-sm font-medium">{count}</span>
                     </div>
-                    <span className="text-sm font-medium">{count}</span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Network Density</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {stats.networkDensity}%
+                </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  Percentage of possible connections
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Relationship Strength</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Strong (7+)</span>
+                    <span className="text-sm font-medium text-green-600">{stats.strongRelationships}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Medium (4-6)</span>
+                    <span className="text-sm font-medium text-yellow-600">{stats.mediumRelationships}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Weak (&lt;4)</span>
+                    <span className="text-sm font-medium text-gray-600">{stats.weakRelationships}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Average</span>
+                      <span className="text-sm font-bold">{stats.avgRelationshipStrength}/10</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Network Density</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {((stats.totalLinks / Math.max(1, stats.totalNodes * (stats.totalNodes - 1) / 2)) * 100).toFixed(1)}%
-              </div>
-              <p className="text-xs text-gray-600 mt-1">
-                Percentage of possible connections that exist
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Network Health</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm">
+                  <p>• {stats.totalNodes} stakeholders</p>
+                  <p>• {stats.totalLinks} relationships</p>
+                  <p>• {stats.isolatedNodes} isolated</p>
+                  <p>• Avg influence: {stats.avgInfluence}/10</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Key Insights</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1 text-sm">
-                <p>• {stats.totalNodes} stakeholders mapped</p>
-                <p>• {stats.totalLinks} relationships tracked</p>
-                <p>• Average influence: {stats.avgInfluence}/10</p>
-                <p>• Most common: {Object.entries(stats.sentimentCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'} sentiment</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Advanced Insights */}
+          {stats.insights && stats.insights.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  Advanced Network Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {stats.insights.map((insight, idx) => (
+                    <div 
+                      key={idx} 
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <h4 className="font-semibold text-sm mb-1">{insight.title}</h4>
+                      <p className="text-xs text-gray-600 mb-2">{insight.description}</p>
+                      <div className="text-sm font-medium text-blue-600">{insight.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
