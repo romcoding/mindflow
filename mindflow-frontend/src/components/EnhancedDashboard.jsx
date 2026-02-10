@@ -18,6 +18,8 @@ import StakeholderDetailModal from './StakeholderDetailModal.jsx';
 import KanbanBoard from './KanbanBoard.jsx';
 import TaskCalendar from './TaskCalendar.jsx';
 import UserProfile from './UserProfile.jsx';
+import AIChatWidget from './AIChatWidget.jsx';
+import CommandPalette from './CommandPalette.jsx';
 
 import { 
   LayoutDashboard, 
@@ -47,7 +49,10 @@ import {
   Search,
   Bell,
   Menu,
-  X
+  X,
+  Bot,
+  Command,
+  Sparkles
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -158,30 +163,68 @@ const TaskEditForm = ({ task, onSave, onCancel }) => {
   );
 };
 
-// Note Edit Form Component
+// Note Edit Form Component (with Markdown support)
 const NoteEditForm = ({ note, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
+    title: note.title || '',
     content: note.content || '',
     category: note.category || 'general',
   });
+  const [showPreview, setShowPreview] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
   };
 
+  // Lazy import ReactMarkdown
+  const ReactMarkdownLazy = React.lazy(() => import('react-markdown'));
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="content" className="text-sm font-medium">Content</Label>
-        <Textarea
-          id="content"
-          value={formData.content}
-          onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-          rows={8}
-          required
+        <Label htmlFor="title" className="text-sm font-medium">Title</Label>
+        <Input
+          id="title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          placeholder="Note title (optional)"
           className="mt-1"
         />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="content" className="text-sm font-medium">Content</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Supports Markdown</span>
+            <Button
+              type="button"
+              variant={showPreview ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowPreview(!showPreview)}
+              className="h-7 text-xs"
+            >
+              {showPreview ? 'Edit' : 'Preview'}
+            </Button>
+          </div>
+        </div>
+        {showPreview ? (
+          <div className="border rounded-md p-4 min-h-[200px] bg-white prose prose-sm max-w-none">
+            <React.Suspense fallback={<p>Loading preview...</p>}>
+              <ReactMarkdownLazy>{formData.content || '*No content*'}</ReactMarkdownLazy>
+            </React.Suspense>
+          </div>
+        ) : (
+          <Textarea
+            id="content"
+            value={formData.content}
+            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+            rows={10}
+            required
+            className="mt-1 font-mono text-sm"
+            placeholder="Write your note here... Markdown is supported!\n\n# Heading\n- Bullet point\n**Bold text**"
+          />
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="category" className="text-sm font-medium">Category</Label>
@@ -1108,17 +1151,35 @@ const EnhancedDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Add Section */}
+      {/* Quick Actions Section */}
       <Card>
         <CardContent className="p-6">
-          <Button 
-            onClick={() => setIsQuickAddOpen(true)}
-            className="w-full h-16 text-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-          >
-            <Mic className="w-6 h-6 mr-2" />
-            QUICK ADD - Capture your thoughts instantly
-            <Plus className="w-6 h-6 ml-2" />
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Button 
+              onClick={() => setIsQuickAddOpen(true)}
+              className="h-14 text-base bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            >
+              <Mic className="w-5 h-5 mr-2" />
+              Quick Add - Voice & Text
+              <Plus className="w-5 h-5 ml-2" />
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                // Trigger command palette
+                const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
+                window.dispatchEvent(event);
+              }}
+              className="h-14 text-base border-2 border-dashed hover:border-purple-300 hover:bg-purple-50"
+            >
+              <Command className="w-5 h-5 mr-2" />
+              Command Palette
+              <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 rounded border">⌘K</kbd>
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 text-center mt-2">
+            Press <kbd className="px-1 py-0.5 bg-gray-100 rounded border text-gray-600">⌘J</kbd> to open AI Assistant
+          </p>
         </CardContent>
       </Card>
 
@@ -1393,12 +1454,17 @@ const EnhancedDashboard = () => {
                   <Edit className="h-3 w-3" />
                 </Button>
               </div>
-              <p className="text-gray-900">{note.content}</p>
-              {note.category && (
-                <Badge variant="outline" className="mt-2">
-                  {note.category}
-                </Badge>
+              {note.title && (
+                <h3 className="font-semibold text-gray-900 mb-1">{note.title}</h3>
               )}
+              <p className="text-gray-700 text-sm line-clamp-4">{note.content}</p>
+              <div className="flex items-center gap-2 mt-2">
+                {note.category && (
+                  <Badge variant="outline" className="text-xs">
+                    {note.category}
+                  </Badge>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -1412,6 +1478,198 @@ const EnhancedDashboard = () => {
       </div>
     </div>
   );
+
+  // Render Analytics with AI Insights
+  const renderAnalytics = () => {
+    const totalTasks = tasks.length;
+    const doneTasks = tasks.filter(t => t.status === 'done').length;
+    const todoTasks = tasks.filter(t => t.status === 'todo').length;
+    const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+    const overdueTasks = tasks.filter(t => {
+      if (!t.due_date) return false;
+      return new Date(t.due_date) < new Date() && t.status !== 'done';
+    });
+    const urgentTasks = tasks.filter(t => t.priority === 'urgent' && t.status !== 'done');
+    const highTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'done');
+    const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+    
+    const positiveStakeholders = stakeholders.filter(s => s.sentiment === 'positive').length;
+    const neutralStakeholders = stakeholders.filter(s => s.sentiment === 'neutral').length;
+    const negativeStakeholders = stakeholders.filter(s => s.sentiment === 'negative').length;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Analytics & Insights</h2>
+          <Badge variant="outline" className="flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            AI Powered
+          </Badge>
+        </div>
+
+        {/* Overview Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold text-blue-600">{totalTasks}</p>
+              <p className="text-sm text-gray-600">Total Tasks</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold text-green-600">{completionRate}%</p>
+              <p className="text-sm text-gray-600">Completion Rate</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold text-purple-600">{stakeholders.length}</p>
+              <p className="text-sm text-gray-600">Stakeholders</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-3xl font-bold text-orange-600">{notes.length}</p>
+              <p className="text-sm text-gray-600">Notes</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Task Distribution */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Task Status Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>To Do</span>
+                    <span className="font-medium">{todoTasks}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${totalTasks > 0 ? (todoTasks / totalTasks) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>In Progress</span>
+                    <span className="font-medium">{inProgressTasks}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${totalTasks > 0 ? (inProgressTasks / totalTasks) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Done</span>
+                    <span className="font-medium">{doneTasks}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Stakeholder Sentiment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="flex items-center gap-1">😊 Positive</span>
+                    <span className="font-medium">{positiveStakeholders}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${stakeholders.length > 0 ? (positiveStakeholders / stakeholders.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="flex items-center gap-1">😐 Neutral</span>
+                    <span className="font-medium">{neutralStakeholders}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${stakeholders.length > 0 ? (neutralStakeholders / stakeholders.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="flex items-center gap-1">😟 Negative</span>
+                    <span className="font-medium">{negativeStakeholders}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full" style={{ width: `${stakeholders.length > 0 ? (negativeStakeholders / stakeholders.length) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Attention Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              Items Needing Attention
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {overdueTasks.length === 0 && urgentTasks.length === 0 ? (
+              <div className="text-center py-6 text-gray-500">
+                <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-green-500" />
+                <p>Everything is on track! No overdue or urgent items.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {overdueTasks.map(t => (
+                  <div key={t.id} className="flex items-center gap-3 p-2 bg-red-50 rounded-lg border border-red-100">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{t.title}</p>
+                      <p className="text-xs text-red-600">Overdue: {t.due_date}</p>
+                    </div>
+                  </div>
+                ))}
+                {urgentTasks.filter(t => !overdueTasks.includes(t)).map(t => (
+                  <div key={t.id} className="flex items-center gap-3 p-2 bg-orange-50 rounded-lg border border-orange-100">
+                    <div className="w-2 h-2 rounded-full bg-orange-500" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{t.title}</p>
+                      <p className="text-xs text-orange-600">Urgent priority</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* AI Tip */}
+        <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Bot className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-purple-900 mb-1">AI Assistant Tip</h4>
+                <p className="text-sm text-purple-700">
+                  Press <kbd className="px-1.5 py-0.5 bg-white rounded border border-purple-200 text-xs">⌘J</kbd> to open OpenClaw AI and ask for deeper insights, weekly reviews, or help managing your tasks and stakeholders.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   // Handle authentication loading
   if (authLoading) {
@@ -1589,13 +1847,7 @@ const EnhancedDashboard = () => {
         {currentView === 'tasks' && renderTasks()}
         {currentView === 'stakeholders' && renderStakeholders()}
         {currentView === 'notes' && renderNotes()}
-        {currentView === 'analytics' && (
-          <div className="text-center py-12">
-            <BarChart3 className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Coming Soon</h3>
-            <p className="text-gray-600">Advanced insights and productivity analytics will be available here.</p>
-          </div>
-        )}
+        {currentView === 'analytics' && renderAnalytics()}
       </main>
 
       {/* Quick Add Modal */}
@@ -1817,6 +2069,26 @@ const EnhancedDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* AI Chat Widget - Always visible */}
+      <AIChatWidget onDataChange={loadData} />
+
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette
+        onNavigate={(view) => setCurrentView(view)}
+        onQuickAdd={(type) => {
+          setIsQuickAddOpen(true);
+        }}
+        onOpenAI={() => {
+          // Trigger AI chat open via keyboard shortcut
+          const event = new KeyboardEvent('keydown', { key: 'j', metaKey: true });
+          window.dispatchEvent(event);
+        }}
+        tasks={tasks}
+        stakeholders={stakeholders}
+        notes={notes}
+        currentView={currentView}
+      />
 
       {/* User Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>

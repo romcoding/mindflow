@@ -44,8 +44,10 @@ import {
   BarChart3,
   Target,
   Users,
-  Brain
+  Brain,
+  MessageCircle
 } from 'lucide-react';
+import TelegramSettings from './TelegramSettings.jsx';
 
 const UserProfile = ({ user, onUpdateProfile, onChangePassword, onDeleteAccount, onLogout }) => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -332,10 +334,14 @@ const UserProfile = ({ user, onUpdateProfile, onChangePassword, onDeleteAccount,
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="telegram" className="flex items-center gap-1">
+            <MessageCircle className="h-3 w-3" />
+            Telegram
+          </TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
 
@@ -820,6 +826,11 @@ const UserProfile = ({ user, onUpdateProfile, onChangePassword, onDeleteAccount,
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Telegram Tab */}
+        <TabsContent value="telegram" className="space-y-6">
+          <TelegramSettings />
         </TabsContent>
 
         {/* Data Tab */}

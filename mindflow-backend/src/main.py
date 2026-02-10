@@ -27,6 +27,8 @@ from src.routes.stakeholder_relationships import stakeholder_relationships_bp, s
 from src.routes.admin import admin_bp
 from src.routes.ai_parser import ai_parser_bp
 from src.routes.linkedin import linkedin_bp
+from src.routes.ai_assistant import ai_assistant_bp
+from src.routes.telegram_bot import telegram_bp
 from datetime import timedelta
 from src.extensions import limiter
 from flask_limiter.util import get_remote_address
@@ -139,6 +141,8 @@ app.register_blueprint(stakeholder_interactions_bp, url_prefix='/api')
 app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(ai_parser_bp, url_prefix='/api')
 app.register_blueprint(linkedin_bp, url_prefix='/api')
+app.register_blueprint(ai_assistant_bp, url_prefix='/api')
+app.register_blueprint(telegram_bp, url_prefix='/api')
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')

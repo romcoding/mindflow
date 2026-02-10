@@ -211,6 +211,14 @@ export const notesAPI = {
 
 export const aiAPI = {
   parseContent: (text) => api.post('/ai/parse-content', { text }),
+  chat: (message, history) => api.post('/ai/chat', { message, history }),
+  quickInsight: () => api.get('/ai/quick-insight'),
+};
+
+export const telegramAPI = {
+  setup: (botToken, webhookUrl) => api.post('/telegram/setup', { bot_token: botToken, webhook_url: webhookUrl }),
+  generateLinkToken: () => api.post('/telegram/generate-link-token'),
+  getStatus: () => api.get('/telegram/status'),
 };
 
 export const linkedinAPI = {
