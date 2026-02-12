@@ -316,50 +316,71 @@ def process_callback(chat_id, callback_data, message_id, token):
 # ── Action helpers ─────────────────────────────────────────────────────
 
 def _create_task_from_text(chat_id, user_id, text, token):
-    """Use AI to parse text and create a task"""
+    """Use AI to parse text and create a task with comprehensive extraction"""
     try:
         from src.routes.ai_assistant import get_client, _exec_create_task
         
+        today = datetime.utcnow().strftime('%Y-%m-%d')
         client = get_client()
         if client:
-            # Use AI to extract task details
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Extract task information from the text. Return JSON with: title, description, priority (low/medium/high/urgent), due_date (YYYY-MM-DD or null). Today is " + datetime.utcnow().strftime('%Y-%m-%d')},
-                    {"role": "user", "content": text}
+                    {"role": "system", "content": (
+                        "You are a task extraction assistant. Extract structured task data from natural language "
+                        "or voice-transcribed text. Handle speech-to-text errors gracefully. Return ONLY valid JSON."
+                    )},
+                    {"role": "user", "content": (
+                        f"Extract task information from this text. Today is {today}.\n"
+                        f"Return JSON with:\n"
+                        f"- title: concise action-oriented title (max 80 chars)\n"
+                        f"- description: detailed description or context\n"
+                        f"- priority: low|medium|high|urgent (ASAP/critical=urgent, important/soon=high)\n"
+                        f"- due_date: YYYY-MM-DD (interpret 'tomorrow', 'next week', 'end of month', etc.)\n"
+                        f"- status: todo|in_progress|waiting|done\n"
+                        f"- board_column: todo|in_progress|review|done\n"
+                        f"- stakeholder_name: name of related person if mentioned, or null\n\n"
+                        f"Text: \"{text}\"\n\nReturn ONLY valid JSON."
+                    )}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=300
+                temperature=0.2,
+                max_tokens=400
             )
-            task_data = json.loads(response.choices[0].message.content)
+            td = json.loads(response.choices[0].message.content)
         else:
-            task_data = {"title": text, "priority": "medium"}
+            td = {"title": text, "priority": "medium"}
+        
+        status = td.get('status') or 'todo'
+        status_to_col = {'todo': 'todo', 'in_progress': 'in_progress', 'waiting': 'review', 'done': 'done'}
         
         result = _exec_create_task(user_id, {
-            "title": task_data.get("title", text),
-            "description": task_data.get("description", ""),
-            "priority": task_data.get("priority", "medium"),
-            "due_date": task_data.get("due_date"),
-            "status": "todo"
+            "title": td.get("title", text),
+            "description": td.get("description", ""),
+            "priority": td.get("priority", "medium"),
+            "due_date": td.get("due_date"),
+            "status": status,
+            "board_column": status_to_col.get(status, 'todo')
         })
         
         if result['success']:
             task = result['task']
+            priority_emoji = {'urgent': '\ud83d\udd34', 'high': '\ud83d\udfe0', 'medium': '\ud83d\udfe1', 'low': '\ud83d\udfe2'}.get(task.get('priority', 'medium'), '\u26aa')
             msg = (
-                f"✅ *Task created!*\n\n"
-                f"📝 *{task['title']}*\n"
-                f"Priority: {task.get('priority', 'medium')}\n"
-                f"Due: {task.get('due_date', 'Not set')}\n"
-                f"Status: {task.get('status', 'todo')}"
+                f"\u2705 *Task created!*\n\n"
+                f"\ud83d\udcdd *{task['title']}*\n"
             )
+            if task.get('description'): msg += f"\n{task['description'][:200]}\n"
+            msg += f"\n{priority_emoji} Priority: {task.get('priority', 'medium')}\n"
+            msg += f"\ud83d\udcca Status: {task.get('status', 'todo')}\n"
+            if task.get('due_date'): msg += f"\ud83d\udcc5 Due: {task['due_date']}\n"
+            if td.get('stakeholder_name'): msg += f"\ud83d\udc64 Related: {td['stakeholder_name']}\n"
             send_message(token, chat_id, msg, main_menu_keyboard())
         else:
-            send_message(token, chat_id, f"❌ Failed to create task: {result.get('message', 'Unknown error')}")
+            send_message(token, chat_id, f"\u274c Failed to create task: {result.get('message', 'Unknown error')}")
     except Exception as e:
         logger.error(f"Task creation error: {e}")
-        send_message(token, chat_id, f"❌ Error creating task: {str(e)}")
+        send_message(token, chat_id, f"\u274c Error creating task: {str(e)}")
 
 
 def _create_note_from_text(chat_id, user_id, text, token):
@@ -385,60 +406,119 @@ def _create_note_from_text(chat_id, user_id, text, token):
 
 
 def _create_stakeholder_from_text(chat_id, user_id, text, token):
-    """Use AI to parse text and create a stakeholder"""
+    """Use AI to parse text and create a stakeholder with comprehensive field extraction"""
     try:
         from src.routes.ai_assistant import get_client, _exec_create_stakeholder
         
         client = get_client()
         if client:
+            system_prompt = (
+                "You are an AI extraction system for a CRM/stakeholder management tool. "
+                "Extract ALL possible information about a person from natural language or voice-transcribed text. "
+                "Handle spelling errors and phonetic misspellings gracefully. "
+                "Infer fields intelligently (e.g., 'CEO' \u2192 seniority_level: 'executive', influence: 8). "
+                "Use null for any field not mentioned or inferable. Return ONLY valid JSON."
+            )
+            extraction_prompt = (
+                f"Extract ALL stakeholder fields from this text. Return JSON with these keys:\n"
+                f"BASIC: name, role, company, department, job_title, email, phone\n"
+                f"PERSONAL: birthday (YYYY-MM-DD), personal_notes, family_info, hobbies, education, career_history\n"
+                f"PROFESSIONAL: seniority_level (junior|mid|senior|executive), years_experience (int), "
+                f"specializations (comma-separated), decision_making_authority (low|medium|high), "
+                f"budget_authority (none|limited|significant|full), work_style\n"
+                f"GEOGRAPHIC: location, timezone, preferred_language, cultural_background\n"
+                f"COMMUNICATION: preferred_communication_method (email|phone|slack|teams|whatsapp), "
+                f"communication_frequency (daily|weekly|monthly|as_needed), best_contact_time, "
+                f"communication_style (formal|casual|direct|diplomatic)\n"
+                f"SOCIAL: linkedin_url, twitter_handle\n"
+                f"RELATIONSHIP: sentiment (positive|neutral|negative), influence (1-10), interest (1-10), "
+                f"trust_level (1-10), strategic_value (low|medium|high|critical), tags (comma-separated)\n\n"
+                f"Text: \"{text}\"\n\nReturn ONLY valid JSON."
+            )
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Extract contact/person information from the text. Return JSON with: name, role, company, department, email, phone, personal_notes, location. Use null for missing fields."},
-                    {"role": "user", "content": text}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": extraction_prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3,
-                max_tokens=300
+                temperature=0.2,
+                max_tokens=600
             )
-            data = json.loads(response.choices[0].message.content)
+            d = json.loads(response.choices[0].message.content)
         else:
-            # Basic extraction
             words = text.split()
-            data = {"name": ' '.join(words[:2]) if len(words) >= 2 else text, "personal_notes": text}
+            d = {"name": ' '.join(words[:2]) if len(words) >= 2 else text, "personal_notes": text}
         
-        if not data.get('name'):
-            data['name'] = text.split(',')[0].strip() if ',' in text else text[:50]
+        if not d.get('name'):
+            d['name'] = text.split(',')[0].strip() if ',' in text else text[:50]
         
-        result = _exec_create_stakeholder(user_id, {
-            "name": data.get("name", "Unknown"),
-            "role": data.get("role"),
-            "company": data.get("company"),
-            "department": data.get("department"),
-            "email": data.get("email"),
-            "phone": data.get("phone"),
-            "personal_notes": data.get("personal_notes", text),
-            "location": data.get("location"),
-            "sentiment": "neutral",
-            "influence": 5,
-            "interest": 5
-        })
+        # Helper for safe int conversion
+        def safe_int(val, default=None):
+            if val is None: return default
+            try: return int(val)
+            except (ValueError, TypeError): return default
+        
+        # Build comprehensive stakeholder data matching ALL model fields
+        stakeholder_data = {
+            "name": d.get("name", "Unknown"),
+            "role": d.get("role") or d.get("job_title"),
+            "company": d.get("company"),
+            "department": d.get("department"),
+            "job_title": d.get("job_title") or d.get("role"),
+            "email": d.get("email"),
+            "phone": d.get("phone"),
+            "birthday": d.get("birthday"),
+            "personal_notes": d.get("personal_notes") or text,
+            "family_info": d.get("family_info"),
+            "hobbies": d.get("hobbies"),
+            "education": d.get("education"),
+            "career_history": d.get("career_history"),
+            "seniority_level": d.get("seniority_level"),
+            "years_experience": safe_int(d.get("years_experience")),
+            "specializations": d.get("specializations"),
+            "decision_making_authority": d.get("decision_making_authority"),
+            "budget_authority": d.get("budget_authority"),
+            "work_style": d.get("work_style"),
+            "location": d.get("location"),
+            "timezone": d.get("timezone"),
+            "preferred_language": d.get("preferred_language"),
+            "cultural_background": d.get("cultural_background"),
+            "preferred_communication_method": d.get("preferred_communication_method"),
+            "communication_frequency": d.get("communication_frequency"),
+            "best_contact_time": d.get("best_contact_time"),
+            "communication_style": d.get("communication_style"),
+            "linkedin_url": d.get("linkedin_url"),
+            "twitter_handle": d.get("twitter_handle"),
+            "sentiment": d.get("sentiment") or "neutral",
+            "influence": safe_int(d.get("influence"), 5),
+            "interest": safe_int(d.get("interest"), 5),
+            "trust_level": safe_int(d.get("trust_level"), 5),
+            "strategic_value": d.get("strategic_value") or "medium",
+        }
+        
+        # Remove None values to avoid overwriting defaults
+        stakeholder_data = {k: v for k, v in stakeholder_data.items() if v is not None}
+        
+        result = _exec_create_stakeholder(user_id, stakeholder_data)
         
         if result['success']:
             s = result['stakeholder']
-            msg = (
-                f"✅ *Contact added!*\n\n"
-                f"👤 *{s['name']}*\n"
-            )
-            if s.get('role'): msg += f"Role: {s['role']}\n"
+            msg = f"\u2705 *Contact added!*\n\n\ud83d\udc64 *{s['name']}*\n"
+            if s.get('job_title') or s.get('role'): msg += f"Title: {s.get('job_title') or s.get('role')}\n"
             if s.get('company'): msg += f"Company: {s['company']}\n"
+            if s.get('department'): msg += f"Dept: {s['department']}\n"
             if s.get('email'): msg += f"Email: {s['email']}\n"
+            if s.get('phone'): msg += f"Phone: {s['phone']}\n"
+            if s.get('location'): msg += f"Location: {s['location']}\n"
+            if s.get('seniority_level'): msg += f"Seniority: {s['seniority_level']}\n"
+            if s.get('linkedin_url'): msg += f"LinkedIn: {s['linkedin_url']}\n"
             send_message(token, chat_id, msg, main_menu_keyboard())
         else:
-            send_message(token, chat_id, f"❌ Failed to add contact: {result.get('message')}")
+            send_message(token, chat_id, f"\u274c Failed to add contact: {result.get('message')}")
     except Exception as e:
         logger.error(f"Stakeholder creation error: {e}")
-        send_message(token, chat_id, f"❌ Error adding contact: {str(e)}")
+        send_message(token, chat_id, f"\u274c Error adding contact: {str(e)}")
 
 
 def _send_status(chat_id, user_id, token):

@@ -667,156 +667,115 @@ const EnhancedDashboard = () => {
       analysis = { ...analysis, type };
     }
     
+    // Close the quick add dialog first
+    setIsQuickAddOpen(false);
+    setQuickAddText('');
+    setAnalysisResult(null);
+    
     try {
-      // Verify we have a token before making the request
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('❌ No token available for quick add');
-        alert('You are not authenticated. Please log in again.');
-        return;
-      }
-      
-      console.log('🔑 Token available for quick add:', token.substring(0, 20) + '...');
-      
       if (analysis.type === 'task') {
+        // Build pre-filled task object and open the edit modal for review
         const taskInfo = analysis.task_info || {};
-        const taskData = {
+        const prefilled = {
           title: taskInfo.title || quickAddText,
           description: taskInfo.description || '',
           priority: taskInfo.priority || analysis.priority || 'medium',
           due_date: taskInfo.due_date || analysis.dueDate || null,
           status: taskInfo.status || 'todo',
-          board_column: 'todo'
+          board_column: taskInfo.board_column || 'todo',
+          stakeholder_name: taskInfo.stakeholder_name || null,
+          _isNew: true  // Flag so save handler knows to create, not update
         };
-        console.log('Creating task:', taskData);
-        await tasksAPI.createTask(taskData);
-        alert('Task created successfully!');
+        console.log('📝 Opening task modal with pre-filled data:', prefilled);
+        setSelectedTask(prefilled);
+        setIsTaskEditOpen(true);
+        
       } else if (analysis.type === 'stakeholder') {
-        const stakeholderInfo = analysis.stakeholder_info || analysis.stakeholderInfo || {};
+        // Build comprehensive pre-filled stakeholder from AI extraction
+        const info = analysis.stakeholder_info || analysis.stakeholderInfo || {};
         
-        // Extract name - try multiple sources and ensure it's never empty
-        let name = stakeholderInfo.name;
+        // Ensure name is never empty
+        let name = info.name;
         if (!name || name.trim() === '') {
-          // Try extracted names from local parsing
-          if (analysis.extractedNames && analysis.extractedNames.length > 0) {
+          if (analysis.extractedNames?.length > 0) {
             name = analysis.extractedNames[0];
-          }
-        }
-        
-        // If still no name, try to extract from text patterns
-        if (!name || name.trim() === '' || name === 'New Contact') {
-          // Try pattern: "Name, Company Role" or "Name - Role at Company"
-          const commaPattern = quickAddText.match(/^([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*),/);
-          if (commaPattern && commaPattern[1]) {
-            name = commaPattern[1];
           } else {
-            // Try first capitalized words (up to 2-3 words for full name)
-            const nameMatches = quickAddText.match(/\b[A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+){0,2}\b/);
-            if (nameMatches && nameMatches[0]) {
-              name = nameMatches[0];
-            } else {
-              // Last resort: use first few words of text
-              const words = quickAddText.trim().split(/\s+/);
-              name = words.slice(0, 2).join(' ') || 'New Contact';
-            }
+            const commaPattern = quickAddText.match(/^([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*),/);
+            name = commaPattern?.[1] || quickAddText.split(/\s+/).slice(0, 2).join(' ') || 'New Contact';
           }
         }
         
-        // Ensure name is not empty
-        if (!name || name.trim() === '') {
-          name = 'New Contact';
-        }
-        
-        // If AI didn't extract company/role but we have them in local parsing, use those
-        if (!stakeholderInfo.company && analysis.stakeholderInfo?.company) {
-          stakeholderInfo.company = analysis.stakeholderInfo.company;
-        }
-        if (!stakeholderInfo.role && !stakeholderInfo.job_title && analysis.stakeholderInfo?.role) {
-          stakeholderInfo.role = analysis.stakeholderInfo.role;
-        }
-        
-        // Log what we extracted for debugging
-        console.log('📊 AI Extracted Stakeholder Info:', {
-          name: stakeholderInfo.name,
-          company: stakeholderInfo.company,
-          role: stakeholderInfo.role,
-          job_title: stakeholderInfo.job_title,
-          email: stakeholderInfo.email,
-          phone: stakeholderInfo.phone,
-          location: stakeholderInfo.location,
-          fullInfo: stakeholderInfo
-        });
-        
-        // Combine personal_notes with other_info if available
-        let personalNotes = stakeholderInfo.personal_notes || quickAddText;
-        if (stakeholderInfo.other_info && stakeholderInfo.other_info !== personalNotes) {
-          personalNotes = `${personalNotes}\n\nAdditional info: ${stakeholderInfo.other_info}`;
-        }
-        
-        const stakeholderData = {
-          name: name.trim(),
-          role: stakeholderInfo.role || stakeholderInfo.job_title || null,
-          company: stakeholderInfo.company || null,
-          email: stakeholderInfo.email || null,
-          phone: stakeholderInfo.phone || null,
-          birthday: stakeholderInfo.birthday || null,
-          department: stakeholderInfo.department || null,
-          job_title: stakeholderInfo.job_title || stakeholderInfo.role || null,
-          location: stakeholderInfo.location || null,
-          linkedin_url: stakeholderInfo.linkedin_url || null,
-          personal_notes: personalNotes.trim() || null,
-          sentiment: 'neutral',
-          influence: 5,
-          interest: 5
+        // Build the full stakeholder object matching StakeholderDetailModal fields
+        const prefilled = {
+          // Basic
+          name: (name || '').trim(),
+          role: info.role || info.job_title || '',
+          company: info.company || '',
+          department: info.department || '',
+          job_title: info.job_title || info.role || '',
+          email: info.email || '',
+          phone: info.phone || '',
+          // Personal
+          birthday: info.birthday || '',
+          personal_notes: info.personal_notes || '',
+          family_info: info.family_info || '',
+          hobbies: info.hobbies || '',
+          education: info.education || '',
+          career_history: info.career_history || '',
+          // Professional
+          seniority_level: info.seniority_level || 'mid',
+          years_experience: info.years_experience || 0,
+          specializations: info.specializations ? (typeof info.specializations === 'string' ? info.specializations.split(',').map(s => s.trim()).filter(Boolean) : info.specializations) : [],
+          decision_making_authority: info.decision_making_authority || 'low',
+          budget_authority: info.budget_authority || 'none',
+          work_style: info.work_style || '',
+          // Geographic
+          location: info.location || '',
+          timezone: info.timezone || '',
+          preferred_language: info.preferred_language || 'English',
+          cultural_background: info.cultural_background || '',
+          // Communication
+          preferred_communication_method: info.preferred_communication_method || 'email',
+          communication_frequency: info.communication_frequency || 'weekly',
+          best_contact_time: info.best_contact_time || '',
+          communication_style: info.communication_style || '',
+          // Social
+          linkedin_url: info.linkedin_url || '',
+          twitter_handle: info.twitter_handle || '',
+          // Relationship
+          sentiment: info.sentiment || 'neutral',
+          influence: info.influence || 5,
+          interest: info.interest || 5,
+          trust_level: info.trust_level || 5,
+          strategic_value: info.strategic_value || 'medium',
+          risk_level: 'low',
+          opportunity_potential: 'medium',
+          tags: info.tags ? (typeof info.tags === 'string' ? info.tags.split(',').map(s => s.trim()).filter(Boolean) : info.tags) : [],
+          // Context
+          current_projects: [],
+          availability_status: 'available',
+          collaboration_history: '',
+          conflict_resolution_style: '',
+          _isNew: true  // Flag so save handler knows to create, not update
         };
         
-        console.log('✅ Creating stakeholder with final data:', stakeholderData);
-        const response = await stakeholdersAPI.createStakeholder(stakeholderData);
-        console.log('Stakeholder creation response:', response.data);
-        alert('Contact created successfully!');
+        console.log('👤 Opening stakeholder modal with pre-filled data:', prefilled);
+        setSelectedStakeholder(prefilled);
+        setIsStakeholderModalOpen(true);
+        
       } else {
+        // Notes: create directly (simple enough)
         const noteData = {
           content: quickAddText,
           category: 'general'
         };
-        console.log('Creating note:', noteData);
         await notesAPI.createNote(noteData);
         alert('Note created successfully!');
+        await loadData();
       }
-      
-      setQuickAddText('');
-      setIsQuickAddOpen(false);
-      setAnalysisResult(null);
-      await loadData(); // Ensure data is reloaded
     } catch (error) {
-      console.error('❌ Failed to create item:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
-      
-      let errorMessage = 'Failed to create item';
-      if (error.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please log in again.';
-        // Clear tokens and reload to force re-login
-        localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        window.location.reload();
-      } else {
-        const errorData = error.response?.data;
-        if (errorData?.error) {
-          errorMessage = errorData.error;
-          if (errorData.details) {
-            errorMessage += `: ${errorData.details}`;
-          }
-        } else if (errorData?.message) {
-          errorMessage = errorData.message;
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-      }
-      
-      alert(errorMessage);
+      console.error('❌ Failed to process quick add:', error);
+      alert('Failed to process input: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -1020,14 +979,20 @@ const EnhancedDashboard = () => {
 
   const handleTaskSave = async (taskData) => {
     try {
-      if (selectedTask && selectedTask.id) {
+      // Check if this is a new task (from AI quick add) or an existing one
+      if (selectedTask && selectedTask._isNew) {
+        // CREATE new task — remove internal flags before sending
+        const { _isNew, stakeholder_name, ...createData } = taskData;
+        console.log('🆕 Creating new task from AI extraction:', createData);
+        await tasksAPI.createTask(createData);
+        alert('Task created successfully!');
+      } else if (selectedTask && selectedTask.id) {
         console.log('Saving task:', taskData);
         console.log('Current task board_column:', selectedTask.board_column);
         console.log('New task board_column:', taskData.board_column);
         
         // Always update board_column if status changed
         if (taskData.status && taskData.board_column) {
-          // Ensure board_column matches status
           const statusToColumn = {
             'todo': 'todo',
             'in_progress': 'in_progress',
@@ -1041,13 +1006,11 @@ const EnhancedDashboard = () => {
         if (taskData.board_column && taskData.board_column !== selectedTask.board_column) {
           console.log(`Moving task from ${selectedTask.board_column} to ${taskData.board_column}`);
           await tasksAPI.moveTask(selectedTask.id, taskData.board_column, null);
-          // Update other fields separately (excluding board_column as it's already updated)
           const { board_column, ...otherFields } = taskData;
           if (Object.keys(otherFields).length > 0) {
             await tasksAPI.updateTask(selectedTask.id, otherFields);
           }
         } else {
-          // Just update the task normally
           await tasksAPI.updateTask(selectedTask.id, taskData);
         }
         alert('Task updated successfully!');
@@ -2058,8 +2021,17 @@ const EnhancedDashboard = () => {
       <Dialog open={isTaskEditOpen} onOpenChange={setIsTaskEditOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-            <DialogDescription>Update task details</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedTask?._isNew ? 'Create Task' : 'Edit Task'}
+              {selectedTask?._isNew && (
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                  <Sparkles className="h-3 w-3 mr-1" /> AI Pre-filled
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedTask?._isNew ? 'Review the AI-extracted details and save' : 'Update task details'}
+            </DialogDescription>
           </DialogHeader>
           {selectedTask && (
             <TaskEditForm
