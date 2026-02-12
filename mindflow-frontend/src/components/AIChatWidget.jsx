@@ -296,7 +296,7 @@ const AIChatWidget = ({ onDataChange }) => {
         <div className={`fixed z-50 bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col transition-all duration-300 ${
           isExpanded 
             ? 'bottom-4 right-4 left-4 top-4 md:left-auto md:w-[600px] md:top-4' 
-            : 'bottom-4 right-4 w-[380px] h-[560px] max-h-[80vh]'
+            : 'bottom-4 right-4 w-[380px] h-[560px] max-h-[80vh] overflow-hidden'
         }`}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-xl">
@@ -366,7 +366,7 @@ const AIChatWidget = ({ onDataChange }) => {
 
           {/* Quick Actions */}
           {showQuickActions && messages.length <= 1 && (
-            <div className="px-4 pb-2">
+            <div className="px-4 pb-2 flex-shrink-0">
               <p className="text-xs text-gray-400 mb-2">Quick actions:</p>
               <div className="flex flex-wrap gap-1.5">
                 {QUICK_ACTIONS.map((action, i) => {
@@ -387,7 +387,7 @@ const AIChatWidget = ({ onDataChange }) => {
           )}
 
           {/* Input Area */}
-          <div className="border-t p-3">
+          <div className="border-t p-3 flex-shrink-0">
             <form onSubmit={handleSubmit} className="flex items-end gap-2">
               <div className="flex-1 relative">
                 <textarea
