@@ -77,6 +77,27 @@ def get_tasks():
         # get_jwt_identity() returns a string, convert to int for database queries
         current_user_id = int(get_jwt_identity())
         
+        # Auto-cleanup: delete tasks in "done" column for more than 1 day
+        import logging
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=1)
+            stale_done_tasks = EnhancedTask.query.filter(
+                EnhancedTask.user_id == current_user_id,
+                EnhancedTask.board_column == 'done',
+                db.or_(
+                    db.and_(EnhancedTask.completed_at != None, EnhancedTask.completed_at < cutoff),
+                    db.and_(EnhancedTask.completed_at == None, EnhancedTask.updated_at < cutoff)
+                )
+            ).all()
+            if stale_done_tasks:
+                for t in stale_done_tasks:
+                    db.session.delete(t)
+                db.session.commit()
+                logging.info(f"Auto-cleaned {len(stale_done_tasks)} done enhanced task(s) for user {current_user_id}")
+        except Exception as cleanup_err:
+            logging.warning(f"Done enhanced task cleanup failed: {cleanup_err}")
+            db.session.rollback()
+        
         # Get query parameters
         status = request.args.get('status')
         priority = request.args.get('priority')

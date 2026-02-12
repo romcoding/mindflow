@@ -223,17 +223,21 @@ const KanbanBoard = ({
                 </Badge>
                 <div className="flex items-center gap-1">
                   {getStatusIcon(task.status)}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Show task menu
-                    }}
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
+                  {onTaskDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:text-red-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Delete task "${task.title}"?`)) {
+                          onTaskDelete(task.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
 

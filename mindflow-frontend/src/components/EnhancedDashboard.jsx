@@ -1003,6 +1003,16 @@ const EnhancedDashboard = () => {
     }
   };
 
+  const handleTaskDelete = async (taskId) => {
+    try {
+      await tasksAPI.deleteTask(taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      alert(`Failed to delete task: ${error.response?.data?.error || error.message || 'Unknown error'}`);
+    }
+  };
+
   const handleTaskClick = (task) => {
     setSelectedTask(task);
     setIsTaskEditOpen(true);
@@ -1094,6 +1104,18 @@ const EnhancedDashboard = () => {
     } catch (error) {
       console.error('Failed to save stakeholder:', error);
       alert(`Failed to save stakeholder: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
+  const handleStakeholderDelete = async (stakeholderId) => {
+    try {
+      await stakeholdersAPI.deleteStakeholder(stakeholderId);
+      setIsStakeholderModalOpen(false);
+      setSelectedStakeholder(null);
+      setStakeholders(prev => prev.filter(s => s.id !== stakeholderId));
+    } catch (error) {
+      console.error('Failed to delete stakeholder:', error);
+      alert(`Failed to delete stakeholder: ${error.response?.data?.error || error.message || 'Unknown error'}`);
     }
   };
 
@@ -1380,6 +1402,7 @@ const EnhancedDashboard = () => {
           stakeholders={stakeholders}
           onTaskMove={handleTaskMove}
           onTaskClick={handleTaskClick}
+          onTaskDelete={handleTaskDelete}
           onAddTask={(column) => {
             // Open task creation modal for specific column
             setIsQuickAddOpen(true);
@@ -2027,6 +2050,7 @@ const EnhancedDashboard = () => {
         }}
         stakeholder={selectedStakeholder}
         onSave={handleStakeholderSave}
+        onDelete={handleStakeholderDelete}
         isEditing={true}
       />
 

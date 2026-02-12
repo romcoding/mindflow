@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user import db
 from src.models.task import Task
 from src.models.stakeholder import Stakeholder
-from datetime import datetime
+from datetime import datetime, timedelta
 
 tasks_bp = Blueprint('tasks', __name__)
 
@@ -17,6 +17,23 @@ def get_tasks():
         current_user_id_str = get_jwt_identity()
         current_user_id = int(current_user_id_str) if current_user_id_str else None
         logging.info(f"✅ Token validated successfully for user {current_user_id}")
+        
+        # Auto-cleanup: delete tasks in "done" column for more than 1 day
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=1)
+            stale_done_tasks = Task.query.filter(
+                Task.user_id == current_user_id,
+                Task.board_column == 'done',
+                Task.updated_at < cutoff
+            ).all()
+            if stale_done_tasks:
+                for t in stale_done_tasks:
+                    db.session.delete(t)
+                db.session.commit()
+                logging.info(f"Auto-cleaned {len(stale_done_tasks)} done task(s) for user {current_user_id}")
+        except Exception as cleanup_err:
+            logging.warning(f"Done task cleanup failed: {cleanup_err}")
+            db.session.rollback()
         
         # Get query parameters for filtering
         completed = request.args.get('completed')

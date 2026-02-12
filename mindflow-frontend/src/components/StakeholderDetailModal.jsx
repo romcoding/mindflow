@@ -44,6 +44,7 @@ const StakeholderDetailModal = ({
   onClose, 
   stakeholder, 
   onSave, 
+  onDelete,
   isEditing = false 
 }) => {
   const [formData, setFormData] = useState({
@@ -338,7 +339,7 @@ const StakeholderDetailModal = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="name">Full Name *</Label>
                     <Input
                       id="name"
@@ -347,7 +348,7 @@ const StakeholderDetailModal = ({
                       placeholder="Enter full name"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="role">Role/Position</Label>
                     <Input
                       id="role"
@@ -359,7 +360,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="company">Company</Label>
                     <Input
                       id="company"
@@ -368,7 +369,7 @@ const StakeholderDetailModal = ({
                       placeholder="Company name"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="department">Department</Label>
                     <Input
                       id="department"
@@ -380,7 +381,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -394,7 +395,7 @@ const StakeholderDetailModal = ({
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="phone">Phone</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -410,7 +411,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="location">Location</Label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -423,7 +424,7 @@ const StakeholderDetailModal = ({
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="timezone">Timezone</Label>
                     <Input
                       id="timezone"
@@ -448,7 +449,7 @@ const StakeholderDetailModal = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="job_title">Job Title</Label>
                     <Input
                       id="job_title"
@@ -457,7 +458,7 @@ const StakeholderDetailModal = ({
                       placeholder="Official job title"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="seniority_level">Seniority Level</Label>
                     <Select value={formData.seniority_level} onValueChange={(value) => handleInputChange('seniority_level', value)}>
                       <SelectTrigger>
@@ -479,7 +480,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="years_experience">Years of Experience</Label>
                     <Input
                       id="years_experience"
@@ -491,7 +492,7 @@ const StakeholderDetailModal = ({
                       max="50"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="work_style">Work Style</Label>
                     <Input
                       id="work_style"
@@ -503,7 +504,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="decision_making_authority">Decision Making Authority</Label>
                     <Select value={formData.decision_making_authority} onValueChange={(value) => handleInputChange('decision_making_authority', value)}>
                       <SelectTrigger>
@@ -516,7 +517,7 @@ const StakeholderDetailModal = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="budget_authority">Budget Authority</Label>
                     <Select value={formData.budget_authority} onValueChange={(value) => handleInputChange('budget_authority', value)}>
                       <SelectTrigger>
@@ -532,7 +533,7 @@ const StakeholderDetailModal = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label>Specializations/Skills</Label>
                   <div className="flex gap-2 mb-2">
                     <Input
@@ -558,7 +559,7 @@ const StakeholderDetailModal = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="career_history">Career History</Label>
                   <Textarea
                     id="career_history"
@@ -583,7 +584,7 @@ const StakeholderDetailModal = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="birthday">Birthday</Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -596,7 +597,7 @@ const StakeholderDetailModal = ({
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="preferred_language">Preferred Language</Label>
                     <Input
                       id="preferred_language"
@@ -607,7 +608,7 @@ const StakeholderDetailModal = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="family_info">Family Information</Label>
                   <Textarea
                     id="family_info"
@@ -618,7 +619,7 @@ const StakeholderDetailModal = ({
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="hobbies">Hobbies & Interests</Label>
                   <Textarea
                     id="hobbies"
@@ -629,7 +630,7 @@ const StakeholderDetailModal = ({
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="education">Education</Label>
                   <Textarea
                     id="education"
@@ -640,7 +641,7 @@ const StakeholderDetailModal = ({
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="cultural_background">Cultural Background</Label>
                   <Input
                     id="cultural_background"
@@ -650,7 +651,7 @@ const StakeholderDetailModal = ({
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="personal_notes">Personal Notes</Label>
                   <Textarea
                     id="personal_notes"
@@ -675,7 +676,7 @@ const StakeholderDetailModal = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="preferred_communication_method">Preferred Method</Label>
                     <Select value={formData.preferred_communication_method} onValueChange={(value) => handleInputChange('preferred_communication_method', value)}>
                       <SelectTrigger>
@@ -691,7 +692,7 @@ const StakeholderDetailModal = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="communication_frequency">Frequency</Label>
                     <Select value={formData.communication_frequency} onValueChange={(value) => handleInputChange('communication_frequency', value)}>
                       <SelectTrigger>
@@ -710,7 +711,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="best_contact_time">Best Contact Time</Label>
                     <Input
                       id="best_contact_time"
@@ -719,7 +720,7 @@ const StakeholderDetailModal = ({
                       placeholder="e.g., 9-11 AM EST"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="communication_style">Communication Style</Label>
                     <Select value={formData.communication_style} onValueChange={(value) => handleInputChange('communication_style', value)}>
                       <SelectTrigger>
@@ -738,7 +739,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="linkedin_url">LinkedIn Profile</Label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
@@ -768,7 +769,7 @@ const StakeholderDetailModal = ({
                       </Button>
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="twitter_handle">Twitter Handle</Label>
                     <div className="relative">
                       <Twitter className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -797,7 +798,7 @@ const StakeholderDetailModal = ({
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Sentiment</Label>
                     <Select value={formData.sentiment} onValueChange={(value) => handleInputChange('sentiment', value)}>
                       <SelectTrigger>
@@ -814,7 +815,7 @@ const StakeholderDetailModal = ({
                     </Badge>
                   </div>
 
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Availability Status</Label>
                     <Select value={formData.availability_status} onValueChange={(value) => handleInputChange('availability_status', value)}>
                       <SelectTrigger>
@@ -830,7 +831,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="space-y-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Influence Level: {formData.influence}/10 ({getInfluenceLabel(formData.influence)})</Label>
                     <Slider
                       value={[formData.influence]}
@@ -842,7 +843,7 @@ const StakeholderDetailModal = ({
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Interest Level: {formData.interest}/10</Label>
                     <Slider
                       value={[formData.interest]}
@@ -854,7 +855,7 @@ const StakeholderDetailModal = ({
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>Trust Level: {formData.trust_level}/10</Label>
                     <Slider
                       value={[formData.trust_level]}
@@ -868,7 +869,7 @@ const StakeholderDetailModal = ({
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="strategic_value">Strategic Value</Label>
                     <Select value={formData.strategic_value} onValueChange={(value) => handleInputChange('strategic_value', value)}>
                       <SelectTrigger>
@@ -882,7 +883,7 @@ const StakeholderDetailModal = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="risk_level">Risk Level</Label>
                     <Select value={formData.risk_level} onValueChange={(value) => handleInputChange('risk_level', value)}>
                       <SelectTrigger>
@@ -895,7 +896,7 @@ const StakeholderDetailModal = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="opportunity_potential">Opportunity</Label>
                     <Select value={formData.opportunity_potential} onValueChange={(value) => handleInputChange('opportunity_potential', value)}>
                       <SelectTrigger>
@@ -910,7 +911,7 @@ const StakeholderDetailModal = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label>Current Projects</Label>
                   <div className="flex gap-2 mb-2">
                     <Input
@@ -936,7 +937,7 @@ const StakeholderDetailModal = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="collaboration_history">Collaboration History</Label>
                   <Textarea
                     id="collaboration_history"
@@ -947,7 +948,7 @@ const StakeholderDetailModal = ({
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <Label>Tags</Label>
                   <div className="flex gap-2 mb-2">
                     <Input
@@ -978,14 +979,32 @@ const StakeholderDetailModal = ({
         </Tabs>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} className="flex items-center gap-2">
-            <Save className="h-4 w-4" />
-            Save Stakeholder
-          </Button>
+        <div className="flex justify-between pt-4 border-t">
+          <div>
+            {onDelete && stakeholder && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (window.confirm(`Delete stakeholder "${formData.name}"? This cannot be undone.`)) {
+                    onDelete(stakeholder.id);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} className="flex items-center gap-2">
+              <Save className="h-4 w-4" />
+              Save Stakeholder
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
