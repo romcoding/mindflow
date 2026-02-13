@@ -79,7 +79,21 @@ def create_stakeholder():
         except (ValueError, TypeError):
             return jsonify({'error': 'Influence and interest must be integers between 1 and 10'}), 400
         
-        # Create stakeholder
+        # Helper for safe int conversion
+        def safe_int(val, default=None):
+            if val is None:
+                return default
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return default
+
+        # Validate trust_level
+        trust_level = safe_int(data.get('trust_level'), 5)
+        if not (1 <= trust_level <= 10):
+            trust_level = 5
+
+        # Create stakeholder with all model fields
         stakeholder = Stakeholder(
             user_id=current_user_id,
             name=clean_optional(data.get('name')),
@@ -93,13 +107,52 @@ def create_stakeholder():
             personal_notes=clean_optional(data.get('personal_notes')),
             sentiment=sentiment,
             influence=influence,
-            interest=interest
+            interest=interest,
+            # Professional details
+            job_title=clean_optional(data.get('job_title')),
+            seniority_level=clean_optional(data.get('seniority_level')),
+            years_experience=safe_int(data.get('years_experience')),
+            specializations=clean_optional(data.get('specializations')) if isinstance(data.get('specializations'), str) else None,
+            decision_making_authority=clean_optional(data.get('decision_making_authority')),
+            budget_authority=clean_optional(data.get('budget_authority')),
+            # Personal
+            family_info=clean_optional(data.get('family_info')),
+            hobbies=clean_optional(data.get('hobbies')),
+            education=clean_optional(data.get('education')),
+            career_history=clean_optional(data.get('career_history')),
+            # Geographic
+            location=clean_optional(data.get('location')),
+            timezone=clean_optional(data.get('timezone')),
+            preferred_language=clean_optional(data.get('preferred_language')),
+            cultural_background=clean_optional(data.get('cultural_background')),
+            # Communication
+            preferred_communication_method=clean_optional(data.get('preferred_communication_method')),
+            communication_frequency=clean_optional(data.get('communication_frequency')),
+            best_contact_time=clean_optional(data.get('best_contact_time')),
+            communication_style=clean_optional(data.get('communication_style')),
+            # Social
+            linkedin_url=clean_optional(data.get('linkedin_url')),
+            twitter_handle=clean_optional(data.get('twitter_handle')),
+            # Relationship
+            trust_level=trust_level,
+            strategic_value=clean_optional(data.get('strategic_value')),
+            availability_status=clean_optional(data.get('availability_status')),
         )
         
         # Handle tags
         tags = data.get('tags', [])
         if isinstance(tags, list):
             stakeholder.set_tags_list(tags)
+
+        # Handle specializations as list
+        specializations = data.get('specializations')
+        if isinstance(specializations, list):
+            stakeholder.set_specializations_list(specializations)
+
+        # Handle current_projects
+        projects = data.get('current_projects')
+        if isinstance(projects, list):
+            stakeholder.set_current_projects_list(projects)
         
         db.session.add(stakeholder)
         db.session.commit()

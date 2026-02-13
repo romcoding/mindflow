@@ -347,6 +347,15 @@ def _exec_create_stakeholder(user_id, args):
     from src.models.stakeholder import Stakeholder
     from src.models.user import db
     
+    # Helper for safe int conversion
+    def safe_int(val, default=None):
+        if val is None:
+            return default
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+
     s = Stakeholder(
         user_id=user_id,
         name=args['name'],
@@ -359,9 +368,38 @@ def _exec_create_stakeholder(user_id, args):
         personal_notes=args.get('personal_notes'),
         location=args.get('location'),
         sentiment=args.get('sentiment', 'neutral'),
-        influence=args.get('influence', 5),
-        interest=args.get('interest', 5),
-        tags=args.get('tags')
+        influence=safe_int(args.get('influence'), 5),
+        interest=safe_int(args.get('interest'), 5),
+        tags=args.get('tags'),
+        # Professional details
+        job_title=args.get('job_title'),
+        work_style=args.get('work_style'),
+        seniority_level=args.get('seniority_level'),
+        years_experience=safe_int(args.get('years_experience')),
+        specializations=args.get('specializations'),
+        decision_making_authority=args.get('decision_making_authority'),
+        budget_authority=args.get('budget_authority'),
+        # Personal
+        family_info=args.get('family_info'),
+        hobbies=args.get('hobbies'),
+        education=args.get('education'),
+        career_history=args.get('career_history'),
+        # Geographic
+        timezone=args.get('timezone'),
+        preferred_language=args.get('preferred_language'),
+        cultural_background=args.get('cultural_background'),
+        # Communication
+        preferred_communication_method=args.get('preferred_communication_method'),
+        communication_frequency=args.get('communication_frequency'),
+        best_contact_time=args.get('best_contact_time'),
+        communication_style=args.get('communication_style'),
+        # Social
+        linkedin_url=args.get('linkedin_url'),
+        twitter_handle=args.get('twitter_handle'),
+        # Relationship
+        trust_level=safe_int(args.get('trust_level'), 5),
+        strategic_value=args.get('strategic_value'),
+        availability_status=args.get('availability_status'),
     )
     db.session.add(s)
     db.session.commit()
