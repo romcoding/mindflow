@@ -300,6 +300,21 @@ try:
             logger.warning(f"Could not add OAuth columns automatically: {str(migration_error)[:200]}")
             logger.info("You may need to run add_oauth_columns.py manually")
         
+        # Try to add telegram_chat_id column if it doesn't exist
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            if 'user' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('user')]
+                if 'telegram_chat_id' not in columns:
+                    logger.info("Adding missing telegram_chat_id column")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN telegram_chat_id VARCHAR(50)'))
+                        conn.commit()
+                    logger.info("telegram_chat_id column added successfully")
+        except Exception as migration_error:
+            logger.warning(f"Could not add telegram_chat_id column: {str(migration_error)[:200]}")
+        
         # Try to add missing task columns if they don't exist
         try:
             from sqlalchemy import inspect, text

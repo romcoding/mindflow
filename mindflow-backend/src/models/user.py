@@ -17,6 +17,8 @@ class User(db.Model):
     oauth_provider = db.Column(db.String(20), nullable=True)  # 'google', 'github', etc.
     oauth_provider_id = db.Column(db.String(255), nullable=True)  # Provider's user ID
     avatar_url = db.Column(db.String(500), nullable=True)  # Profile picture URL from OAuth
+    # Telegram integration
+    telegram_chat_id = db.Column(db.String(50), nullable=True, unique=True)  # Telegram chat ID for persistent linking
 
     # Relationships
     tasks = db.relationship('Task', backref='user', lazy=True, cascade='all, delete-orphan')

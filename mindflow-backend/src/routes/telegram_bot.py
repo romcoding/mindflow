@@ -90,19 +90,48 @@ def confirm_keyboard(action_id):
 
 # ── User linking (Telegram chat_id ↔ MindFlow user) ──────────────────
 
-# In-memory store for linked users and pending states
-# In production, this should be stored in the database
-_linked_users = {}  # chat_id -> user_id
+# In-memory cache for linked users and pending states
+# Falls back to database for persistent storage
+_linked_users = {}  # chat_id -> user_id (cache)
 _link_tokens = {}   # token -> user_id
 _user_states = {}   # chat_id -> {state, data}
 
 def get_user_id_for_chat(chat_id):
-    """Get MindFlow user_id for a Telegram chat_id"""
-    return _linked_users.get(str(chat_id))
+    """Get MindFlow user_id for a Telegram chat_id. Checks cache first, then database."""
+    chat_id_str = str(chat_id)
+    # Check in-memory cache first
+    if chat_id_str in _linked_users:
+        return _linked_users[chat_id_str]
+    # Fall back to database
+    try:
+        from src.models.user import User
+        user = User.query.filter_by(telegram_chat_id=chat_id_str).first()
+        if user:
+            _linked_users[chat_id_str] = user.id  # Populate cache
+            return user.id
+    except Exception as e:
+        logger.warning(f"DB lookup for telegram_chat_id failed: {e}")
+    return None
 
 def link_user(chat_id, user_id):
-    """Link a Telegram chat to a MindFlow user"""
-    _linked_users[str(chat_id)] = user_id
+    """Link a Telegram chat to a MindFlow user. Saves to both cache and database."""
+    chat_id_str = str(chat_id)
+    _linked_users[chat_id_str] = user_id
+    # Persist to database
+    try:
+        from src.models.user import User
+        from src.models.db import db
+        user = User.query.get(user_id)
+        if user:
+            # Clear any previous user linked to this chat_id
+            prev = User.query.filter_by(telegram_chat_id=chat_id_str).first()
+            if prev and prev.id != user_id:
+                prev.telegram_chat_id = None
+            user.telegram_chat_id = chat_id_str
+            db.session.commit()
+            logger.info(f"Persisted Telegram link: chat {chat_id} -> user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to persist Telegram link: {e}")
     logger.info(f"Linked Telegram chat {chat_id} to user {user_id}")
 
 def set_user_state(chat_id, state, data=None):
@@ -416,12 +445,17 @@ def _create_stakeholder_from_text(chat_id, user_id, text, token):
                 "You are an AI extraction system for a CRM/stakeholder management tool. "
                 "Extract ALL possible information about a person from natural language or voice-transcribed text. "
                 "Handle spelling errors and phonetic misspellings gracefully. "
-                "Infer fields intelligently (e.g., 'CEO' \u2192 seniority_level: 'executive', influence: 8). "
+                "Infer fields intelligently (e.g., 'CEO' → seniority_level: 'executive', influence: 8). "
                 "Use null for any field not mentioned or inferable. Return ONLY valid JSON."
             )
             extraction_prompt = (
-                f"Extract ALL stakeholder fields from this text. Return JSON with these keys:\n"
-                f"BASIC: name, role, company, department, job_title, email, phone\n"
+                f"Extract ALL stakeholder fields from the text below. Return JSON with these keys:\n"
+                f"BASIC:\n"
+                f"  - name: ONLY the person's first and last name (e.g. 'John Smith'). "
+                f"Do NOT include titles, roles, companies, or any other text in the name field.\n"
+                f"  - role: their job role or position title\n"
+                f"  - company: the organization they work for\n"
+                f"  - department, job_title, email, phone\n"
                 f"PERSONAL: birthday (YYYY-MM-DD), personal_notes, family_info, hobbies, education, career_history\n"
                 f"PROFESSIONAL: seniority_level (junior|mid|senior|executive), years_experience (int), "
                 f"specializations (comma-separated), decision_making_authority (low|medium|high), "
@@ -446,12 +480,24 @@ def _create_stakeholder_from_text(chat_id, user_id, text, token):
                 max_tokens=600
             )
             d = json.loads(response.choices[0].message.content)
+            logger.info(f"AI stakeholder extraction result: {json.dumps(d)[:500]}")
         else:
             words = text.split()
             d = {"name": ' '.join(words[:2]) if len(words) >= 2 else text, "personal_notes": text}
         
         if not d.get('name'):
             d['name'] = text.split(',')[0].strip() if ',' in text else text[:50]
+        
+        # Safety check: if name is too long, it likely contains the full text
+        import re
+        if len(d['name']) > 60:
+            # Try to extract just the name: take text up to first punctuation or preposition
+            match = re.match(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})', d['name'])
+            if match:
+                d['name'] = match.group(1)
+            else:
+                # Fallback: first two words
+                d['name'] = ' '.join(d['name'].split()[:2])
         
         # Helper for safe int conversion
         def safe_int(val, default=None):
