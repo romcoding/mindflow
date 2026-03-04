@@ -1,0 +1,87 @@
+# ─────────────────────────────────────────────────────────────────────
+# MindFlow / Rovot — Docker Compose
+#
+# Usage:
+#   Development:  docker compose up
+#   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Environment variables should be set in a .env file at the project root.
+# ─────────────────────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL Database ────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mindflow}
+      POSTGRES_USER: ${POSTGRES_USER:-mindflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend API ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./mindflow-backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mindflow}:${POSTGRES_PASSWORD:-changeme_in_production}@db:5432/${POSTGRES_DB:-mindflow}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-a-random-secret}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-}
+      FLASK_ENV: ${FLASK_ENV:-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      # Messaging channels
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      SIGNAL_API_URL: ${SIGNAL_API_URL:-http://signal-api:8080}
+      SIGNAL_PHONE_NUMBER: ${SIGNAL_PHONE_NUMBER:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+
+  # ── Frontend (development only) ───────────────────────────────────
+  frontend:
+    build:
+      context: ./mindflow-frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-5000}/api
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+  # ── Signal CLI REST API (optional) ────────────────────────────────
+  signal-api:
+    image: bbernhard/signal-cli-rest-api:latest
+    restart: unless-stopped
+    profiles:
+      - signal
+    environment:
+      MODE: json-rpc
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    ports:
+      - "${SIGNAL_PORT:-8080}:8080"
+
+volumes:
+  pgdata:
+  signal-data:

@@ -29,6 +29,9 @@ from src.routes.ai_parser import ai_parser_bp
 from src.routes.linkedin import linkedin_bp
 from src.routes.ai_assistant import ai_assistant_bp
 from src.routes.telegram_bot import telegram_bp
+from src.routes.llm_settings import llm_settings_bp
+from src.routes.messaging import messaging_bp
+from src.routes.services import services_bp, init_services
 from datetime import timedelta
 from src.extensions import limiter
 from flask_limiter.util import get_remote_address
@@ -143,6 +146,12 @@ app.register_blueprint(ai_parser_bp, url_prefix='/api')
 app.register_blueprint(linkedin_bp, url_prefix='/api')
 app.register_blueprint(ai_assistant_bp, url_prefix='/api')
 app.register_blueprint(telegram_bp, url_prefix='/api')
+app.register_blueprint(llm_settings_bp, url_prefix='/api')
+app.register_blueprint(messaging_bp, url_prefix='/api')
+app.register_blueprint(services_bp, url_prefix='/api')
+
+# Initialise background services
+init_services(app)
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')
@@ -448,6 +457,7 @@ except Exception as e:
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint for monitoring"""
     try:
@@ -464,61 +474,19 @@ def health_check():
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
-# JWT configuration debug endpoint (for troubleshooting)
-@app.route('/api/debug/jwt-config', methods=['GET'])
-def debug_jwt_config():
-    """Debug endpoint to verify JWT configuration"""
-    config_info = {
-        'jwt_secret_key_set': bool(app.config.get('JWT_SECRET_KEY')),
-        'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
-        'jwt_algorithm': app.config.get('JWT_ALGORITHM', 'NOT SET'),
-        'jwt_access_token_expires': str(app.config.get('JWT_ACCESS_TOKEN_EXPIRES')),
-        'jwt_token_location': app.config.get('JWT_TOKEN_LOCATION', []),
-        'secret_key_set': bool(app.config.get('SECRET_KEY')),
-        'secret_key_length': len(app.config.get('SECRET_KEY', '')),
-        'env_jwt_secret_key_set': bool(os.environ.get('JWT_SECRET_KEY')),
-        'env_secret_key_set': bool(os.environ.get('SECRET_KEY')),
-        'secret_keys_match': app.config.get('JWT_SECRET_KEY') == app.config.get('SECRET_KEY'),
-        'env_secret_keys_match': os.environ.get('JWT_SECRET_KEY') == os.environ.get('SECRET_KEY'),
-    }
-    return jsonify(config_info), 200
-
-# Test token validation endpoint
-@app.route('/api/debug/test-token', methods=['POST'])
-def test_token_validation():
-    """Test endpoint to manually validate a token"""
-    try:
-        from flask_jwt_extended import decode_token
-        from flask import request as req
-        
-        data = req.get_json()
-        token = data.get('token')
-        
-        if not token:
-            return jsonify({'error': 'No token provided'}), 400
-        
-        # Try to decode the token
-        try:
-            decoded = decode_token(token)
-            return jsonify({
-                'success': True,
-                'decoded': {
-                    'sub': decoded.get('sub'),
-                    'exp': decoded.get('exp'),
-                    'iat': decoded.get('iat'),
-                    'type': decoded.get('type'),
-                },
-                'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
-            }), 200
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
-            }), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Debug endpoints — DISABLED in production
+if os.environ.get('FLASK_ENV') != 'production':
+    @app.route('/api/debug/jwt-config', methods=['GET'])
+    def debug_jwt_config():
+        """Debug endpoint to verify JWT configuration (dev only)"""
+        config_info = {
+            'jwt_secret_key_set': bool(app.config.get('JWT_SECRET_KEY')),
+            'jwt_secret_key_length': len(app.config.get('JWT_SECRET_KEY', '')),
+            'jwt_algorithm': app.config.get('JWT_ALGORITHM', 'NOT SET'),
+            'jwt_access_token_expires': str(app.config.get('JWT_ACCESS_TOKEN_EXPIRES')),
+            'jwt_token_location': app.config.get('JWT_TOKEN_LOCATION', []),
+        }
+        return jsonify(config_info), 200
 
 # Security headers middleware
 @app.after_request

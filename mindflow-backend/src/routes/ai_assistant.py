@@ -1,9 +1,10 @@
 """
-AI Assistant (OpenClaw) - Conversational AI for MindFlow
-Uses OpenAI function calling to create/edit/query tasks, stakeholders, notes,
+AI Assistant (OpenClaw/Rovot) - Conversational AI for MindFlow
+Uses LLM provider abstraction to support OpenAI, LM Studio, Ollama, etc.
+Implements function calling to create/edit/query tasks, stakeholders, notes,
 and generate insights.
 """
-from flask import Blueprint, request, jsonify, stream_with_context, Response
+from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import os
 import json
@@ -13,10 +14,25 @@ from datetime import datetime, timedelta
 ai_assistant_bp = Blueprint('ai_assistant', __name__)
 logger = logging.getLogger(__name__)
 
-# OpenAI client (lazy init)
+
+def _get_provider(user_id=None):
+    """Get the LLM provider for the current user."""
+    try:
+        from src.routes.llm_settings import get_provider_for_user
+        if user_id:
+            return get_provider_for_user(user_id)
+    except Exception:
+        pass
+    # Fallback to default provider
+    from src.llm.factory import get_llm_provider
+    return get_llm_provider()
+
+
+# Legacy compatibility: keep get_client() for telegram_bot.py etc.
 _client = None
 
 def get_client():
+    """Legacy OpenAI client getter for backward compatibility."""
     global _client
     if _client is not None:
         return _client
@@ -34,6 +50,7 @@ def get_client():
     except Exception as e:
         logger.error(f"Failed to init OpenAI client: {e}")
         return None
+
 
 # ── Tool definitions for function calling ──────────────────────────────
 
@@ -139,7 +156,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "update_stakeholder",
-            "description": "Update an existing stakeholder/contact. Use when the user wants to edit contact information.",
+            "description": "Update an existing stakeholder/contact.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -166,7 +183,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "list_stakeholders",
-            "description": "List stakeholders/contacts with optional filters. Use when the user asks about their contacts or network.",
+            "description": "List stakeholders/contacts with optional filters.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -181,7 +198,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "create_note",
-            "description": "Create a new note in MindFlow. Use when the user wants to save a thought, idea, or information.",
+            "description": "Create a new note in MindFlow.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -229,13 +246,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "generate_insights",
-            "description": "Generate AI-powered insights and analysis about the user's productivity, tasks, stakeholders, or notes. Use when the user asks for a summary, analysis, recommendations, or insights.",
+            "description": "Generate AI-powered insights and analysis about the user's productivity, tasks, stakeholders, or notes.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "focus": {
                         "type": "string",
-                        "enum": ["productivity", "stakeholders", "tasks", "notes", "weekly_review", "general"],
+                        "enum": ["general", "tasks", "stakeholders", "notes", "productivity"],
                         "description": "What area to focus the insights on"
                     },
                     "question": {"type": "string", "description": "Specific question the user is asking"}
@@ -251,7 +268,7 @@ TOOLS = [
 def _exec_create_task(user_id, args):
     from src.models.task import Task
     from src.models.user import db
-    
+
     status_to_column = {
         'todo': 'todo', 'in_progress': 'in_progress',
         'waiting': 'review', 'done': 'done'
@@ -275,23 +292,23 @@ def _exec_create_task(user_id, args):
 def _exec_update_task(user_id, args):
     from src.models.task import Task
     from src.models.user import db
-    
+
     task = Task.query.filter_by(id=args['task_id'], user_id=user_id).first()
     if not task:
         return {"success": False, "message": f"Task with ID {args['task_id']} not found."}
-    
+
     status_to_column = {
         'todo': 'todo', 'in_progress': 'in_progress',
         'waiting': 'review', 'done': 'done'
     }
-    
+
     for field in ['title', 'description', 'priority', 'due_date', 'status', 'board_column', 'completed']:
         if field in args and args[field] is not None:
             setattr(task, field, args[field])
-    
+
     if 'status' in args:
         task.board_column = status_to_column.get(args['status'], task.board_column)
-    
+
     db.session.commit()
     return {"success": True, "task": task.to_dict(), "message": f"Task '{task.title}' updated successfully."}
 
@@ -299,11 +316,11 @@ def _exec_update_task(user_id, args):
 def _exec_delete_task(user_id, args):
     from src.models.task import Task
     from src.models.user import db
-    
+
     task = Task.query.filter_by(id=args['task_id'], user_id=user_id).first()
     if not task:
         return {"success": False, "message": f"Task with ID {args['task_id']} not found."}
-    
+
     title = task.title
     db.session.delete(task)
     db.session.commit()
@@ -312,29 +329,29 @@ def _exec_delete_task(user_id, args):
 
 def _exec_list_tasks(user_id, args):
     from src.models.task import Task
-    
+
     query = Task.query.filter_by(user_id=user_id)
-    
+
     status = args.get('status', 'all')
     if status and status != 'all':
         query = query.filter_by(status=status)
-    
+
     priority = args.get('priority', 'all')
     if priority and priority != 'all':
         query = query.filter_by(priority=priority)
-    
+
     search = args.get('search')
     if search:
         query = query.filter(
             (Task.title.ilike(f'%{search}%')) | (Task.description.ilike(f'%{search}%'))
         )
-    
+
     tasks = query.order_by(Task.created_at.desc()).all()
-    
+
     if args.get('overdue_only'):
         today = datetime.utcnow().strftime('%Y-%m-%d')
         tasks = [t for t in tasks if t.due_date and t.due_date < today and t.status != 'done']
-    
+
     return {
         "success": True,
         "tasks": [t.to_dict() for t in tasks],
@@ -346,8 +363,7 @@ def _exec_list_tasks(user_id, args):
 def _exec_create_stakeholder(user_id, args):
     from src.models.stakeholder import Stakeholder
     from src.models.user import db
-    
-    # Helper for safe int conversion
+
     def safe_int(val, default=None):
         if val is None:
             return default
@@ -371,7 +387,6 @@ def _exec_create_stakeholder(user_id, args):
         influence=safe_int(args.get('influence'), 5),
         interest=safe_int(args.get('interest'), 5),
         tags=args.get('tags'),
-        # Professional details
         job_title=args.get('job_title'),
         work_style=args.get('work_style'),
         seniority_level=args.get('seniority_level'),
@@ -379,24 +394,19 @@ def _exec_create_stakeholder(user_id, args):
         specializations=args.get('specializations'),
         decision_making_authority=args.get('decision_making_authority'),
         budget_authority=args.get('budget_authority'),
-        # Personal
         family_info=args.get('family_info'),
         hobbies=args.get('hobbies'),
         education=args.get('education'),
         career_history=args.get('career_history'),
-        # Geographic
         timezone=args.get('timezone'),
         preferred_language=args.get('preferred_language'),
         cultural_background=args.get('cultural_background'),
-        # Communication
         preferred_communication_method=args.get('preferred_communication_method'),
         communication_frequency=args.get('communication_frequency'),
         best_contact_time=args.get('best_contact_time'),
         communication_style=args.get('communication_style'),
-        # Social
         linkedin_url=args.get('linkedin_url'),
         twitter_handle=args.get('twitter_handle'),
-        # Relationship
         trust_level=safe_int(args.get('trust_level'), 5),
         strategic_value=args.get('strategic_value'),
         availability_status=args.get('availability_status'),
@@ -409,16 +419,16 @@ def _exec_create_stakeholder(user_id, args):
 def _exec_update_stakeholder(user_id, args):
     from src.models.stakeholder import Stakeholder
     from src.models.user import db
-    
+
     s = Stakeholder.query.filter_by(id=args['stakeholder_id'], user_id=user_id).first()
     if not s:
         return {"success": False, "message": f"Stakeholder with ID {args['stakeholder_id']} not found."}
-    
+
     for field in ['name', 'role', 'company', 'department', 'email', 'phone', 'birthday',
                   'personal_notes', 'location', 'sentiment', 'influence', 'interest', 'tags']:
         if field in args and args[field] is not None:
             setattr(s, field, args[field])
-    
+
     s.last_contact = datetime.utcnow()
     db.session.commit()
     return {"success": True, "stakeholder": s.to_dict(), "message": f"Stakeholder '{s.name}' updated successfully."}
@@ -426,9 +436,9 @@ def _exec_update_stakeholder(user_id, args):
 
 def _exec_list_stakeholders(user_id, args):
     from src.models.stakeholder import Stakeholder
-    
+
     query = Stakeholder.query.filter_by(user_id=user_id)
-    
+
     search = args.get('search')
     if search:
         query = query.filter(
@@ -436,11 +446,11 @@ def _exec_list_stakeholders(user_id, args):
             (Stakeholder.company.ilike(f'%{search}%')) |
             (Stakeholder.role.ilike(f'%{search}%'))
         )
-    
+
     sentiment = args.get('sentiment', 'all')
     if sentiment and sentiment != 'all':
         query = query.filter_by(sentiment=sentiment)
-    
+
     stakeholders = query.order_by(Stakeholder.name).all()
     return {
         "success": True,
@@ -453,7 +463,7 @@ def _exec_list_stakeholders(user_id, args):
 def _exec_create_note(user_id, args):
     from src.models.note import Note
     from src.models.user import db
-    
+
     note = Note(
         user_id=user_id,
         content=args['content'],
@@ -468,34 +478,34 @@ def _exec_create_note(user_id, args):
 def _exec_update_note(user_id, args):
     from src.models.note import Note
     from src.models.user import db
-    
+
     note = Note.query.filter_by(id=args['note_id'], user_id=user_id).first()
     if not note:
         return {"success": False, "message": f"Note with ID {args['note_id']} not found."}
-    
+
     for field in ['content', 'title', 'category']:
         if field in args and args[field] is not None:
             setattr(note, field, args[field])
-    
+
     db.session.commit()
     return {"success": True, "note": note.to_dict(), "message": "Note updated successfully."}
 
 
 def _exec_list_notes(user_id, args):
     from src.models.note import Note
-    
+
     query = Note.query.filter_by(user_id=user_id)
-    
+
     search = args.get('search')
     if search:
         query = query.filter(
             (Note.content.ilike(f'%{search}%')) | (Note.title.ilike(f'%{search}%'))
         )
-    
+
     category = args.get('category')
     if category:
         query = query.filter_by(category=category)
-    
+
     notes = query.order_by(Note.created_at.desc()).all()
     return {
         "success": True,
@@ -509,21 +519,20 @@ def _exec_generate_insights(user_id, args):
     from src.models.task import Task
     from src.models.stakeholder import Stakeholder
     from src.models.note import Note
-    
+
     focus = args.get('focus', 'general')
-    
+
     tasks = Task.query.filter_by(user_id=user_id).all()
     stakeholders = Stakeholder.query.filter_by(user_id=user_id).all()
     notes = Note.query.filter_by(user_id=user_id).all()
-    
+
     today = datetime.utcnow().strftime('%Y-%m-%d')
-    
-    # Build context data
+
     total_tasks = len(tasks)
     done_tasks = len([t for t in tasks if t.status == 'done'])
     overdue = [t for t in tasks if t.due_date and t.due_date < today and t.status != 'done']
     high_priority = [t for t in tasks if t.priority in ('high', 'urgent') and t.status != 'done']
-    
+
     data = {
         "tasks_summary": {
             "total": total_tasks,
@@ -547,22 +556,21 @@ def _exec_generate_insights(user_id, args):
             "recent": [{"content": n.content[:100], "category": n.category} for n in notes[:5]]
         }
     }
-    
-    # Count by status/priority
+
     for t in tasks:
         s = t.status or 'todo'
         data["tasks_summary"]["by_status"][s] = data["tasks_summary"]["by_status"].get(s, 0) + 1
         p = t.priority or 'medium'
         data["tasks_summary"]["by_priority"][p] = data["tasks_summary"]["by_priority"].get(p, 0) + 1
-    
+
     for s in stakeholders:
         sent = s.sentiment or 'neutral'
         data["stakeholders_summary"]["by_sentiment"][sent] = data["stakeholders_summary"]["by_sentiment"].get(sent, 0) + 1
-    
+
     for n in notes:
         cat = n.category or 'general'
         data["notes_summary"]["by_category"][cat] = data["notes_summary"]["by_category"].get(cat, 0) + 1
-    
+
     return {
         "success": True,
         "data": data,
@@ -589,7 +597,7 @@ FUNCTION_MAP = {
 
 # ── System prompt ──────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are OpenClaw, the AI assistant for MindFlow — a personal productivity and stakeholder management app.
+SYSTEM_PROMPT = """You are Rovot (formerly OpenClaw), the AI assistant for MindFlow — a personal productivity and stakeholder management app.
 
 You help users manage their tasks, stakeholders/contacts, and notes through natural conversation. You are friendly, concise, and action-oriented.
 
@@ -628,54 +636,53 @@ def ai_chat():
         data = request.get_json()
         user_message = data.get('message', '').strip()
         conversation_history = data.get('history', [])
-        
+
         if not user_message:
             return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        client = get_client()
-        if not client:
-            return jsonify({"success": False, "error": "AI service not available. Please configure OPENAI_API_KEY."}), 503
-        
+
+        # Use the LLM provider abstraction
+        try:
+            provider = _get_provider(user_id)
+        except Exception as e:
+            logger.error(f"LLM provider error: {e}")
+            return jsonify({"success": False, "error": "AI service not available. Please configure your LLM provider in Settings."}), 503
+
         today = datetime.utcnow().strftime('%Y-%m-%d')
         system_msg = SYSTEM_PROMPT.replace('{today}', today)
-        
+
         # Build messages array
         messages = [{"role": "system", "content": system_msg}]
-        
-        # Add conversation history (last 20 messages to keep context manageable)
+
+        # Add conversation history (last 20 messages)
         for msg in conversation_history[-20:]:
             if msg.get('role') in ('user', 'assistant'):
                 messages.append({"role": msg['role'], "content": msg['content']})
-        
-        # Add current user message
+
         messages.append({"role": "user", "content": user_message})
-        
+
         # First API call - may include tool calls
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
+        response = provider.chat_completion(
+            messages,
             tools=TOOLS,
             tool_choice="auto",
             temperature=0.7,
-            max_tokens=2000
+            max_tokens=2000,
         )
-        
-        assistant_message = response.choices[0].message
-        tool_calls = assistant_message.tool_calls
-        
+
         actions_taken = []
-        
+
         # Process tool calls if any
-        if tool_calls:
-            # Add assistant message with tool calls to messages
-            messages.append(assistant_message)
-            
-            for tool_call in tool_calls:
-                fn_name = tool_call.function.name
-                fn_args = json.loads(tool_call.function.arguments)
-                
-                logger.info(f"🔧 Executing function: {fn_name} with args: {json.dumps(fn_args)}")
-                
+        if response.tool_calls:
+            # Add assistant message with tool calls to messages (for the raw API)
+            if response.raw:
+                messages.append(response.raw.choices[0].message)
+
+            for tc in response.tool_calls:
+                fn_name = tc.function_name
+                fn_args = tc.arguments
+
+                logger.info(f"Executing function: {fn_name} with args: {json.dumps(fn_args)}")
+
                 executor = FUNCTION_MAP.get(fn_name)
                 if executor:
                     try:
@@ -690,33 +697,30 @@ def ai_chat():
                         result = {"success": False, "error": str(e)}
                 else:
                     result = {"success": False, "error": f"Unknown function: {fn_name}"}
-                
-                # Add function result to messages
+
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tc.id,
                     "content": json.dumps(result, default=str)
                 })
-            
-            # Second API call to get final response after function execution
-            final_response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
+
+            # Second API call to get final response
+            final_response = provider.chat_completion(
+                messages,
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=2000,
             )
-            
-            final_text = final_response.choices[0].message.content
+            final_text = final_response.content
         else:
-            final_text = assistant_message.content
-        
+            final_text = response.content
+
         return jsonify({
             "success": True,
             "message": final_text,
             "actions": actions_taken,
             "has_actions": len(actions_taken) > 0
         }), 200
-        
+
     except Exception as e:
         logger.error(f"AI chat error: {e}")
         import traceback
@@ -731,30 +735,29 @@ def quick_insight():
     try:
         user_id = get_jwt_identity()
         result = _exec_generate_insights(user_id, {"focus": "general"})
-        
+
         if not result['success']:
             return jsonify(result), 500
-        
+
         data = result['data']
-        
-        # Build a quick insight without AI call for speed
+
         insights = []
-        
+
         overdue_count = data['tasks_summary']['overdue_count']
         if overdue_count > 0:
             insights.append(f"You have {overdue_count} overdue task(s) that need attention.")
-        
+
         completion_rate = data['tasks_summary']['completion_rate']
         if completion_rate >= 80:
             insights.append(f"Great productivity! {completion_rate}% completion rate.")
         elif completion_rate < 50 and data['tasks_summary']['total'] > 0:
             insights.append(f"Your completion rate is {completion_rate}%. Consider breaking tasks into smaller pieces.")
-        
+
         high_influence = data['stakeholders_summary']['high_influence']
         if high_influence:
             names = ', '.join([s['name'] for s in high_influence[:3]])
             insights.append(f"Key stakeholders to engage: {names}")
-        
+
         return jsonify({
             "success": True,
             "insights": insights,
@@ -766,7 +769,7 @@ def quick_insight():
                 "total_notes": data['notes_summary']['total']
             }
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Quick insight error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

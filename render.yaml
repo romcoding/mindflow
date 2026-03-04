@@ -1,24 +1,51 @@
+# ─────────────────────────────────────────────────────────────────────
+# Render.com Deployment Configuration
+#
+# Deploy with: render blueprint apply
+# Or connect this repo in the Render dashboard.
+# ─────────────────────────────────────────────────────────────────────
+
 services:
+  # ── Backend API ────────────────────────────────────────────────────
   - type: web
     name: mindflow-backend
-    env: python
-    buildCommand: "cd mindflow-backend && pip install -r requirements.txt"
-    startCommand: "cd mindflow-backend && python src/main.py"
-    plan: free
-    healthCheckPath: /api/auth/profile
+    runtime: docker
+    dockerfilePath: mindflow-backend/Dockerfile
+    dockerContext: mindflow-backend
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
-      - key: SECRET_KEY
-        generateValue: true
       - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: mindflow-db
           property: connectionString
-    autoDeploy: true
+      - key: FLASK_ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: https://your-frontend-domain.vercel.app
+      # Set these in the Render dashboard (not in YAML for security)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
 
 databases:
   - name: mindflow-db
     databaseName: mindflow
     user: mindflow_user
-    plan: free
+    plan: starter
